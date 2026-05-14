@@ -40,7 +40,11 @@ const Register = ({ navigation }) => {
     setLoading(true);
     try {
       await register(email, password, username, phone);
-      Alert.alert('Thành công', 'Đăng ký tài khoản thành công!');
+      Alert.alert(
+        'Đăng ký thành công',
+        'Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     } catch (error) {
       Alert.alert('Đăng ký thất bại', error.message);
     } finally {

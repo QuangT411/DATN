@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Image,
+  Modal,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,7 +20,9 @@ const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [resetEmail, setResetEmail] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const { login, resetPassword } = useAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -33,6 +36,21 @@ const Login = ({ navigation }) => {
       Alert.alert('Đăng nhập thất bại', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetEmail.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email để khôi phục mật khẩu');
+      return;
+    }
+    try {
+      await resetPassword(resetEmail);
+      Alert.alert('Thành công', 'Email khôi phục mật khẩu đã được gửi!');
+      setModalVisible(false);
+      setResetEmail('');
+    } catch (error) {
+      Alert.alert('Lỗi', error.message);
     }
   };
 
@@ -82,6 +100,13 @@ const Login = ({ navigation }) => {
             />
           </View>
 
+          <TouchableOpacity
+            style={styles.forgotPasswordContainer}
+            onPress={() => setModalVisible(true)}
+          >
+            <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -98,6 +123,48 @@ const Login = ({ navigation }) => {
             <Text style={styles.registerTextBold}>Đăng ký ngay</Text>
           </TouchableOpacity>
         </View>
+
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalView}>
+              <Text style={styles.modalTitle}>Khôi phục mật khẩu</Text>
+              <Text style={styles.modalSubtitle}>Nhập email của bạn để nhận liên kết khôi phục mật khẩu.</Text>
+              
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="email" size={22} color="#2E7D32" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  value={resetEmail}
+                  onChangeText={setResetEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalSubmitButton]}
+                  onPress={handleResetPassword}
+                >
+                  <Text style={styles.modalSubmitText}>Gửi</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -171,6 +238,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  forgotPasswordContainer: {
+    alignItems: 'flex-end',
+    marginTop: -4,
+    marginBottom: 20,
+  },
+  forgotPasswordText: {
+    color: '#2E7D32',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   loginButton: {
     backgroundColor: '#2E7D32',
     borderRadius: 12,
@@ -203,6 +280,64 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#2E7D32',
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalView: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  modalCancelButton: {
+    backgroundColor: '#f5f5f5',
+  },
+  modalSubmitButton: {
+    backgroundColor: '#2E7D32',
+  },
+  modalCancelText: {
+    color: '#666',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalSubmitText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

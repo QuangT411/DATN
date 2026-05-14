@@ -3,7 +3,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
@@ -23,14 +25,25 @@ export const AuthProvider = ({ children }) => {
       username,
       email,
       phone,
+      role: 'user',
       createdAt: serverTimestamp()
     });
+    await sendEmailVerification(userCredential.user);
+    await signOut(auth);
     return userCredential.user;
   };
 
   const login = async (email, password) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    if (!userCredential.user.emailVerified) {
+      await signOut(auth);
+      throw new Error('Chưa xác minh email. Vui lòng kiểm tra hộp thư của bạn.');
+    }
     return userCredential.user;
+  };
+
+  const resetPassword = async (email) => {
+    await sendPasswordResetEmail(auth, email);
   };
 
   const logout = async () => {
@@ -39,13 +52,18 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      // Chỉ set user nếu có currentUser và email đã được xác minh
+      if (currentUser && currentUser.emailVerified) {
+        setUser(currentUser);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
     return unsubscribe;
   }, []);
 
-  const value = { user, loading, register, login, logout };
+  const value = { user, loading, register, login, logout, resetPassword };
 
   return (
     <AuthContext.Provider value={value}>
