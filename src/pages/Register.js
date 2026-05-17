@@ -14,19 +14,36 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+
+const FIELDS = [
+  { key: 'username', label: 'Họ và tên', icon: 'account-outline', placeholder: 'Nhập tên của bạn', type: 'default', capitalize: 'words' },
+  { key: 'email', label: 'Email', icon: 'email-outline', placeholder: 'example@email.com', type: 'email-address', capitalize: 'none' },
+  { key: 'phone', label: 'Số điện thoại', icon: 'phone-outline', placeholder: '0987 654 321', type: 'phone-pad', capitalize: 'none' },
+  { key: 'password', label: 'Mật khẩu', icon: 'lock-outline', placeholder: 'Ít nhất 6 ký tự', secure: true, capitalize: 'none' },
+  { key: 'confirmPassword', label: 'Xác nhận mật khẩu', icon: 'lock-check-outline', placeholder: 'Nhập lại mật khẩu', secure: true, capitalize: 'none' },
+];
 
 const Register = ({ navigation }) => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [form, setForm] = useState({
+    username: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
+  const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
   const handleRegister = async () => {
+    const { username, email, phone, password, confirmPassword } = form;
+
     if (!username.trim() || !email.trim() || !phone.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập đầy đủ tất cả các trường');
       return;
     }
     if (password !== confirmPassword) {
@@ -34,16 +51,17 @@ const Register = ({ navigation }) => {
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      Alert.alert('Mật khẩu quá ngắn', 'Mật khẩu phải có ít nhất 6 ký tự');
       return;
     }
+
     setLoading(true);
     try {
-      await register(email, password, username, phone);
+      await register(email.trim(), password, username.trim(), phone.trim());
       Alert.alert(
-        'Đăng ký thành công',
+        '✓ Đăng ký thành công',
         'Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        [{ text: 'Về đăng nhập', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
       Alert.alert('Đăng ký thất bại', error.message);
@@ -57,98 +75,98 @@ const Register = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.bannerContainer}>
+      <View pointerEvents="none" style={styles.glow1} />
+      <View pointerEvents="none" style={styles.glow2} />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Banner */}
+        <View style={styles.banner}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=800&q=80' }}
+            source={{ uri: 'https://images.unsplash.com/photo-1472141521881-95d0e87e2e39?w=1400&q=80' }}
             style={styles.bannerImage}
           />
           <View style={styles.bannerOverlay}>
-            <MaterialCommunityIcons name="account-plus" size={60} color="#fff" />
+            <MaterialCommunityIcons name="account-plus" size={48} color="rgba(255,255,255,0.95)" />
             <Text style={styles.bannerTitle}>Tạo tài khoản</Text>
-            <Text style={styles.bannerSubtitle}>Tham gia Smart Irrigation</Text>
+
           </View>
         </View>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Đăng ký</Text>
+        {/* Form */}
+        <View style={styles.form}>
+          <Text style={styles.formTitle}>Đăng ký</Text>
 
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="account" size={22} color="#2E7D32" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Tên"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-          </View>
 
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="email" size={22} color="#2E7D32" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-          </View>
+          {FIELDS.map((field) => {
+            const isPassword = field.key === 'password';
+            const isConfirm = field.key === 'confirmPassword';
+            const showEye = isPassword || isConfirm;
+            const secure = (isPassword && !showPassword) || (isConfirm && !showConfirm);
 
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="phone" size={22} color="#2E7D32" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Số điện thoại"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholderTextColor="#999"
-            />
-          </View>
+            return (
+              <View key={field.key}>
+                <Text style={styles.fieldLabel}>{field.label}</Text>
+                <View style={styles.inputWrap}>
+                  <View style={styles.inputIconWrap}>
+                    <MaterialCommunityIcons name={field.icon} size={19} color={colors.primary} />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={field.placeholder}
+                    value={form[field.key]}
+                    onChangeText={(v) => updateField(field.key, v)}
+                    keyboardType={field.type || 'default'}
+                    autoCapitalize={field.capitalize || 'none'}
+                    secureTextEntry={secure}
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  {showEye && (
+                    <TouchableOpacity
+                      style={styles.eyeBtn}
+                      onPress={() =>
+                        isPassword ? setShowPassword(!showPassword) : setShowConfirm(!showConfirm)
+                      }
+                    >
+                      <MaterialCommunityIcons
+                        name={(!isPassword ? showConfirm : showPassword) ? 'eye-off-outline' : 'eye-outline'}
+                        size={19}
+                        color={colors.textMuted}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          })}
 
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="lock" size={22} color="#2E7D32" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Mật khẩu"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="lock-check" size={22} color="#2E7D32" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Xác nhận mật khẩu"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister} disabled={loading}>
+          {/* Register Button */}
+          <TouchableOpacity
+            style={[styles.registerBtn, loading && styles.registerBtnDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.registerButtonText}>Đăng ký</Text>
+              <>
+                <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
+                <Text style={styles.registerBtnText}>Tạo tài khoản</Text>
+              </>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.loginLink}
-            onPress={() => navigation.goBack()}
-          >
+          {/* Login Link */}
+          <View style={styles.loginRow}>
             <Text style={styles.loginText}>Đã có tài khoản? </Text>
-            <Text style={styles.loginTextBold}>Đăng nhập</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.loginLink}>Đăng nhập</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -158,103 +176,161 @@ const Register = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
-  scrollContent: {
-    flexGrow: 1,
+  glow1: {
+    position: 'absolute',
+    top: -120,
+    right: -90,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: colors.glowPrimary,
+    opacity: 0.6,
   },
-  bannerContainer: {
-    height: 200,
+  glow2: {
+    position: 'absolute',
+    bottom: -140,
+    left: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.glowAccent,
+    opacity: 0.6,
+  },
+  scrollContent: { flexGrow: 1 },
+
+  // Banner
+  banner: {
+    height: 220,
     overflow: 'hidden',
+    borderBottomLeftRadius: radii.xl,
+    borderBottomRightRadius: radii.xl,
   },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
+  bannerImage: { width: '100%', height: '100%' },
   bannerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(21, 101, 192, 0.7)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.xxs,
   },
   bannerTitle: {
     fontSize: 26,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 10,
-  },
-  bannerSubtitle: {
-    fontSize: 15,
-    color: '#e3f2fd',
-    marginTop: 4,
-  },
-  formContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    marginTop: -30,
-    paddingHorizontal: 30,
-    paddingTop: 30,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#1565C0',
-    marginBottom: 30,
+    fontFamily: fonts.bold,
+    color: colors.white,
+    letterSpacing: -0.3,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
-  inputContainer: {
+  bannerSub: {
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: 'rgba(255,255,255,0.78)',
+  },
+
+  // Form
+  form: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    marginTop: -radii.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
+  },
+  formTitle: {
+    fontSize: 22,
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
+    letterSpacing: -0.2,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+  formSub: {
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+    lineHeight: 18,
+  },
+
+  // Field
+  fieldLabel: {
+    fontSize: 13,
+    fontFamily: fonts.semibold,
+    color: colors.textSecondary,
+    marginBottom: spacing.xxs,
+    marginLeft: spacing.xxs,
+  },
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    minHeight: 50,
+    paddingHorizontal: spacing.sm,
   },
-  inputIcon: {
-    marginRight: 12,
+  inputIconWrap: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.xxs,
   },
   input: {
     flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    color: colors.textPrimary,
+    paddingVertical: spacing.sm,
   },
-  registerButton: {
-    backgroundColor: '#1565C0',
-    borderRadius: 12,
-    height: 55,
-    justifyContent: 'center',
+  eyeBtn: {
+    padding: spacing.xs,
+  },
+
+  // Register Button
+  registerBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
-    shadowColor: '#1565C0',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    height: 52,
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    ...shadows.soft,
   },
-  registerButtonText: {
+  registerBtnDisabled: { opacity: 0.7 },
+  registerBtnText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    letterSpacing: 0.2,
   },
-  loginLink: {
+
+  // Login Link
+  loginRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
-    marginBottom: 20,
+    alignItems: 'center',
+    marginTop: spacing.lg,
   },
   loginText: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
   },
-  loginTextBold: {
-    fontSize: 15,
-    color: '#1565C0',
-    fontWeight: 'bold',
+  loginLink: {
+    fontSize: 14,
+    fontFamily: fonts.bold,
+    color: colors.primary,
   },
 });
 

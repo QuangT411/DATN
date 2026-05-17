@@ -10,6 +10,28 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+
+const INFO_ROWS = [
+  {
+    icon: 'shield-check',
+    color: colors.primary,
+    label: 'Trạng thái tài khoản',
+    value: 'Đã xác thực email',
+  },
+  {
+    icon: 'cellphone-check',
+    color: colors.accentBlue,
+    label: 'Nền tảng',
+    value: 'Android · iOS · Web',
+  },
+  {
+    icon: 'database-check',
+    color: colors.accentSun,
+    label: 'Firebase',
+    value: 'Đã kết nối',
+  },
+];
 
 const Settings = () => {
   const { user, logout } = useAuth();
@@ -17,7 +39,7 @@ const Settings = () => {
   const handleLogout = () => {
     Alert.alert(
       'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
+      'Bạn có chắc chắn muốn đăng xuất không?',
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -37,61 +59,82 @@ const Settings = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View pointerEvents="none" style={styles.glow1} />
+      <View pointerEvents="none" style={styles.glow2} />
+
+      {/* Hero */}
+      <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&q=80' }}
-          style={styles.bannerImage}
+          source={{ uri: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?w=1400&q=80' }}
+          style={styles.heroImage}
         />
-        <View style={styles.headerOverlay}>
-          <MaterialCommunityIcons name="cog" size={40} color="#fff" />
-          <Text style={styles.headerTitle}>Cài đặt</Text>
-          <Text style={styles.headerSubtitle}>Thông tin tài khoản</Text>
+        <View style={styles.heroOverlay}>
+          <MaterialCommunityIcons name="cog" size={32} color="rgba(255,255,255,0.9)" />
+          <Text style={styles.heroTitle}>Cài đặt</Text>
+
         </View>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Card */}
+        <Text style={styles.sectionLabel}>Tài khoản</Text>
         <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <MaterialCommunityIcons name="account-circle" size={80} color="#2E7D32" />
+          <View style={styles.avatarCircle}>
+            <MaterialCommunityIcons name="account" size={40} color={colors.primary} />
           </View>
-          <Text style={styles.emailLabel}>Email</Text>
-          <Text style={styles.emailValue}>{user?.email || 'Không xác định'}</Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileEmail}>{user?.email || 'Không xác định'}</Text>
+            <View style={styles.verifiedRow}>
+              <MaterialCommunityIcons name="check-circle" size={14} color={colors.primary} />
+              <Text style={styles.verifiedText}>Email đã xác thực</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* UID Card */}
+        <View style={styles.uidCard}>
           <Text style={styles.uidLabel}>User ID</Text>
-          <Text style={styles.uidValue}>{user?.uid || 'N/A'}</Text>
+          <Text style={styles.uidValue} numberOfLines={1} ellipsizeMode="middle">
+            {user?.uid || 'N/A'}
+          </Text>
         </View>
 
+        {/* System Info */}
+        <Text style={styles.sectionLabel}>Thông tin hệ thống</Text>
         <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <MaterialCommunityIcons name="shield-check" size={24} color="#2E7D32" />
-            <View style={styles.infoTextContainer}>
-              <Text style={styles.infoLabel}>Trạng thái</Text>
-              <Text style={styles.infoValue}>Đã xác thực</Text>
+          {INFO_ROWS.map((row, index) => (
+            <View key={row.label}>
+              <View style={styles.infoRow}>
+                <View style={[styles.infoIconWrap, { backgroundColor: row.color + '18' }]}>
+                  <MaterialCommunityIcons name={row.icon} size={20} color={row.color} />
+                </View>
+                <View style={styles.infoText}>
+                  <Text style={styles.infoLabel}>{row.label}</Text>
+                  <Text style={styles.infoValue}>{row.value}</Text>
+                </View>
+                <MaterialCommunityIcons name="check" size={16} color={colors.primary} />
+              </View>
+              {index < INFO_ROWS.length - 1 && <View style={styles.divider} />}
             </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <MaterialCommunityIcons name="cellphone-check" size={24} color="#1565C0" />
-            <View style={styles.infoTextContainer}>
-              <Text style={styles.infoLabel}>Nền tảng</Text>
-              <Text style={styles.infoValue}>Android / iOS / Web</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <MaterialCommunityIcons name="database-check" size={24} color="#E65100" />
-            <View style={styles.infoTextContainer}>
-              <Text style={styles.infoLabel}>Firebase</Text>
-              <Text style={styles.infoValue}>Đã kết nối</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <MaterialCommunityIcons name="logout" size={24} color="#fff" />
-          <Text style={styles.logoutButtonText}>Đăng xuất</Text>
+        {/* Logout */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name="logout" size={20} color="#fff" />
+          <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
 
         <Text style={styles.versionText}>Smart Irrigation v1.0.0</Text>
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );
@@ -100,133 +143,210 @@ const Settings = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f0',
+    backgroundColor: colors.background,
   },
-  header: {
-    height: 160,
+  glow1: {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: colors.glowPrimary,
+    opacity: 0.55,
+  },
+  glow2: {
+    position: 'absolute',
+    bottom: -120,
+    left: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.glowAccent,
+    opacity: 0.55,
+  },
+
+  // Hero
+  hero: {
+    height: 190,
     overflow: 'hidden',
+    borderBottomLeftRadius: radii.xl,
+    borderBottomRightRadius: radii.xl,
   },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  headerOverlay: {
+  heroImage: { width: '100%', height: '100%' },
+  heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(46, 125, 50, 0.75)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.xxs,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 8,
+  heroTitle: {
+    fontSize: 26,
+    fontFamily: fonts.bold,
+    color: colors.white,
+    letterSpacing: -0.3,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#e8f5e9',
-    marginTop: 2,
+  heroSub: {
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: 'rgba(255,255,255,0.75)',
   },
-  content: {
-    flex: 1,
-  },
+
+  scroll: { flex: 1 },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
+
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+
+  // Profile Card
   profileCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+    ...shadows.lift,
   },
-  avatarContainer: {
-    marginBottom: 12,
+  avatarCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
-  emailLabel: {
-    fontSize: 14,
-    color: '#888',
-    fontWeight: '500',
+  profileInfo: { flex: 1 },
+  profileEmail: {
+    fontSize: 15,
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
   },
-  emailValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 4,
+  verifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  verifiedText: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: colors.primary,
+  },
+
+  // UID Card
+  uidCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   uidLabel: {
-    fontSize: 12,
-    color: '#aaa',
-    marginTop: 12,
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 3,
   },
   uidValue: {
     fontSize: 12,
-    color: '#999',
-    marginTop: 2,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+    letterSpacing: 0.3,
   },
+
+  // Info Card
   infoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+    ...shadows.lift,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
   },
-  infoTextContainer: {
-    marginLeft: 16,
+  infoIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
+  infoText: { flex: 1 },
   infoLabel: {
-    fontSize: 14,
-    color: '#888',
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: colors.textMuted,
   },
   infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 2,
+    fontSize: 14,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+    marginTop: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.lg,
   },
-  logoutButton: {
+
+  // Logout
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#c62828',
-    borderRadius: 14,
-    height: 56,
-    gap: 10,
-    shadowColor: '#c62828',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-    marginBottom: 20,
+    backgroundColor: colors.danger,
+    borderRadius: radii.md,
+    height: 52,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    ...shadows.lift,
   },
-  logoutButtonText: {
+  logoutText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    letterSpacing: 0.1,
   },
+
   versionText: {
     textAlign: 'center',
-    fontSize: 13,
-    color: '#bbb',
-    marginBottom: 10,
+    fontSize: 12,
+    color: colors.textMuted,
+    fontFamily: fonts.medium,
+    marginBottom: spacing.sm,
   },
 });
 

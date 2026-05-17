@@ -4,29 +4,34 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Switch,
   TouchableOpacity,
   TextInput,
   Alert,
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { ref, onValue, set } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { useMqtt } from '../context/MqttContext';
+import { TOPICS } from '../mqtt/mqttConfig';
 
 const WaterPump = () => {
+  const { publish, controlPump, mode, setMode, connected } = useMqtt();
+
   const [data, setData] = useState({
     water_liters: 0,
     pump_status: false,
     auto_mode: false,
   });
   const [loading, setLoading] = useState(true);
-  const [autoMode, setAutoMode] = useState(false);
-  const [pumpOn, setPumpOn] = useState(false);
   const [manualTime, setManualTime] = useState('10');
   const [controlLoading, setControlLoading] = useState(false);
 
+  // Vẫn đọc trạng thái từ Firebase
   useEffect(() => {
     const currentRef = ref(database, 'current');
     const unsubscribe = onValue(currentRef, (snapshot) => {
@@ -37,40 +42,40 @@ const WaterPump = () => {
           pump_status: val.pump_status || false,
           auto_mode: val.auto_mode || false,
         });
-        setAutoMode(val.auto_mode || false);
-        setPumpOn(val.pump_status || false);
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const toggleAutoMode = async (value) => {
-    setControlLoading(true);
-    try {
-      await set(ref(database, 'control/auto_mode'), value);
-      setAutoMode(value);
+  // Chuyển chế độ Manual / AI
+  const handleSetMode = (newMode) => {
+    if (!connected) {
+      Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
+      return;
+    }
+    const ok = setMode(newMode);
+    if (ok) {
       Alert.alert(
-        value ? 'Auto Mode BẬT' : 'Auto Mode TẮT',
-        value
-          ? 'Hệ thống sẽ tự động tưới dựa trên cảm biến'
-          : 'Đã chuyển sang chế độ điều khiển thủ công'
+        newMode === 'ai' ? '🤖 Chế độ AI' : '🖐 Chế độ Thủ công',
+        newMode === 'ai'
+          ? 'AI Server sẽ tự động điều khiển bơm'
+          : 'Bạn có thể điều khiển bơm thủ công'
       );
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể thay đổi chế độ: ' + error.message);
-    } finally {
-      setControlLoading(false);
     }
   };
 
+  // Bật bơm thủ công
   const handlePumpOn = async () => {
+    if (!connected) {
+      Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
+      return;
+    }
     setControlLoading(true);
     try {
       const time = parseInt(manualTime) || 10;
-      await set(ref(database, 'control/manual_pump'), 1);
-      await set(ref(database, 'control/manual_time'), time);
-      setPumpOn(true);
-      Alert.alert('Bật bơm', `Máy bơm đã bật. Thời gian: ${time} giây`);
+      const ok = controlPump(true, time); // gửi lệnh + cập nhật UI ngay
+      if (ok) Alert.alert('Bật bơm', `Máy bơm đã bật. Thời gian: ${time} giây`);
     } catch (error) {
       Alert.alert('Lỗi', 'Không thể bật bơm: ' + error.message);
     } finally {
@@ -78,12 +83,16 @@ const WaterPump = () => {
     }
   };
 
+  // Tắt bơm thủ công
   const handlePumpOff = async () => {
+    if (!connected) {
+      Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
+      return;
+    }
     setControlLoading(true);
     try {
-      await set(ref(database, 'control/manual_pump'), 0);
-      setPumpOn(false);
-      Alert.alert('Tắt bơm', 'Máy bơm đã tắt');
+      const ok = controlPump(false); // gửi lệnh + cập nhật UI ngay
+      if (ok) Alert.alert('Tắt bơm', 'Máy bơm đã tắt');
     } catch (error) {
       Alert.alert('Lỗi', 'Không thể tắt bơm: ' + error.message);
     } finally {
@@ -94,324 +103,514 @@ const WaterPump = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1565C0" />
+        <ActivityIndicator size="large" color={colors.accentBlue} />
         <Text style={styles.loadingText}>Đang tải...</Text>
       </View>
     );
   }
 
+  const isManual = mode === 'manual';
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View pointerEvents="none" style={styles.glow1} />
+      <View pointerEvents="none" style={styles.glow2} />
+
+      {/* Hero */}
+      <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80' }}
-          style={styles.bannerImage}
+          source={{ uri: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=1400&q=80' }}
+          style={styles.heroImage}
         />
-        <View style={styles.headerOverlay}>
-          <MaterialCommunityIcons name="water-pump" size={40} color="#fff" />
-          <Text style={styles.headerTitle}>Điều khiển bơm</Text>
-          <Text style={styles.headerSubtitle}>Tưới thủ công & tự động</Text>
+        <View style={styles.heroOverlay}>
+          <MaterialCommunityIcons name="water-pump" size={32} color="rgba(255,255,255,0.9)" />
+          <Text style={styles.heroTitle}>Điều khiển bơm</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.waterDisplay}>
-          <MaterialCommunityIcons name="cup-water" size={48} color="#1565C0" />
-          <Text style={styles.waterLabel}>Lượng nước đã tưới</Text>
-          <Text style={styles.waterValue}>{data.water_liters?.toFixed(2) ?? '0.00'} L</Text>
-        </View>
-
-        <View style={styles.pumpStatusCard}>
-          <MaterialCommunityIcons
-            name={data.pump_status ? 'water-pump' : 'water-pump-off'}
-            size={32}
-            color={data.pump_status ? '#1565C0' : '#999'}
-          />
-          <Text style={styles.pumpStatusLabel}>Trạng thái bơm</Text>
-          <View style={[styles.pumpBadge, data.pump_status ? styles.pumpOn : styles.pumpOff]}>
-            <Text style={styles.pumpBadgeText}>{data.pump_status ? 'ĐANG CHẠY' : 'ĐÃ TẮT'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.controlCard}>
-          <View style={styles.controlHeader}>
-            <MaterialCommunityIcons name="autorenew" size={24} color="#2E7D32" />
-            <Text style={styles.controlTitle}>Auto Mode</Text>
-            <Switch
-              value={autoMode}
-              onValueChange={toggleAutoMode}
-              trackColor={{ false: '#ccc', true: '#81C784' }}
-              thumbColor={autoMode ? '#2E7D32' : '#f4f3f4'}
-              disabled={controlLoading}
-            />
-          </View>
-          <Text style={styles.controlDesc}>
-            {autoMode
-              ? 'Hệ thống tự động tưới dựa trên độ ẩm đất'
-              : 'Bạn đang ở chế độ thủ công'}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Trạng thái kết nối MQTT */}
+        <View style={[styles.mqttBadge, connected ? styles.mqttOn : styles.mqttOff]}>
+          <View style={[styles.mqttDot, { backgroundColor: connected ? '#4ADE80' : colors.danger }]} />
+          <Text style={[styles.mqttText, { color: connected ? '#4ADE80' : colors.danger }]}>
+            MQTT {connected ? 'Đã kết nối' : 'Mất kết nối'}
           </Text>
         </View>
 
-        <View style={styles.manualCard}>
-          <Text style={styles.manualTitle}>
-            <MaterialCommunityIcons name="gesture-tap" size={20} color="#1565C0" /> Điều khiển thủ công
-          </Text>
-
-          <View style={styles.timeInputContainer}>
-            <Text style={styles.timeLabel}>Thời gian tưới (giây):</Text>
-            <TextInput
-              style={styles.timeInput}
-              value={manualTime}
-              onChangeText={setManualTime}
-              keyboardType="number-pad"
-              placeholder="10"
-              placeholderTextColor="#999"
-            />
+        {/* Water + Status Row */}
+        <View style={styles.topRow}>
+          {/* Water liters */}
+          <View style={[styles.topCard, { flex: 1.2 }]}>
+            <View style={styles.topCardIcon}>
+              <MaterialCommunityIcons name="cup-water" size={22} color={colors.accentBlue} />
+            </View>
+            <Text style={styles.topCardLabel}>Đã tưới</Text>
+            <Text style={styles.topCardValue}>{data.water_liters?.toFixed(2) ?? '0.00'} L</Text>
           </View>
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.controlButton, styles.pumpOnButton]}
-              onPress={handlePumpOn}
-              disabled={controlLoading}
-            >
-              {controlLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="power-on" size={22} color="#fff" />
-                  <Text style={styles.controlButtonText}>Pump ON</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.controlButton, styles.pumpOffButton]}
-              onPress={handlePumpOff}
-              disabled={controlLoading}
-            >
-              {controlLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="power-off" size={22} color="#fff" />
-                  <Text style={styles.controlButtonText}>Pump OFF</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          {/* Pump status */}
+          <View style={[styles.topCard, { flex: 1 }]}>
+            <View style={[styles.topCardIcon, { backgroundColor: data.pump_status ? colors.accentBlueSoft : colors.surfaceMuted }]}>
+              <MaterialCommunityIcons
+                name={data.pump_status ? 'water-pump' : 'water-pump-off'}
+                size={22}
+                color={data.pump_status ? colors.accentBlue : colors.textMuted}
+              />
+            </View>
+            <Text style={styles.topCardLabel}>Máy bơm</Text>
+            <View style={[styles.statusPill, data.pump_status ? styles.pillOn : styles.pillOff]}>
+              <View style={[styles.pillDot, { backgroundColor: data.pump_status ? colors.accentBlue : colors.textMuted }]} />
+              <Text style={[styles.pillText, { color: data.pump_status ? colors.accentBlue : colors.textMuted }]}>
+                {data.pump_status ? 'CHẠY' : 'TẮT'}
+              </Text>
+            </View>
           </View>
         </View>
+
+        {/* Chọn chế độ */}
+        <Text style={styles.sectionLabel}>Chế độ hoạt động</Text>
+        <View style={styles.modeRow}>
+          <TouchableOpacity
+            style={[styles.modeBtn, isManual && styles.modeBtnActive]}
+            onPress={() => handleSetMode('manual')}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name="hand-back-right"
+              size={20}
+              color={isManual ? colors.white : colors.textMuted}
+            />
+            <Text style={[styles.modeBtnText, isManual && styles.modeBtnTextActive]}>
+              Thủ công
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.modeBtn, !isManual && styles.modeBtnAi]}
+            onPress={() => handleSetMode('ai')}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name="robot"
+              size={20}
+              color={!isManual ? colors.white : colors.textMuted}
+            />
+            <Text style={[styles.modeBtnText, !isManual && styles.modeBtnTextActive]}>
+              AI
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Nội dung theo chế độ */}
+        {isManual ? (
+          <>
+            <Text style={styles.sectionLabel}>Điều khiển thủ công</Text>
+            <View style={styles.card}>
+              {/* Thời gian tưới */}
+              <View style={styles.timeRow}>
+                <MaterialCommunityIcons name="timer-outline" size={18} color={colors.textSecondary} />
+                <Text style={styles.timeLabel}>Thời gian tưới</Text>
+                <View style={styles.timeInputWrap}>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={manualTime}
+                    onChangeText={setManualTime}
+                    keyboardType="number-pad"
+                    placeholder="10"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.timeUnit}>giây</Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Nút Bật / Tắt */}
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnOn, controlLoading && styles.btnDisabled]}
+                  onPress={handlePumpOn}
+                  disabled={controlLoading}
+                  activeOpacity={0.8}
+                >
+                  {controlLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="water-pump" size={18} color="#fff" />
+                      <Text style={styles.btnText}>Bật bơm</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnOff, controlLoading && styles.btnDisabled]}
+                  onPress={handlePumpOff}
+                  disabled={controlLoading}
+                  activeOpacity={0.8}
+                >
+                  {controlLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="water-pump-off" size={18} color="#fff" />
+                      <Text style={styles.btnText}>Tắt bơm</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionLabel}>Chế độ AI</Text>
+            <View style={styles.aiCard}>
+              <View style={styles.aiIconWrap}>
+                <MaterialCommunityIcons name="robot" size={42} color={colors.primary} />
+              </View>
+              <Text style={styles.aiTitle}>AI đang kiểm soát</Text>
+              <Text style={styles.aiDesc}>
+                AI Server sẽ tự phân tích dữ liệu cảm biến và tự động điều khiển bơm.
+                Bạn không cần làm gì thêm.
+              </Text>
+              <View style={styles.aiActiveBadge}>
+                <View style={styles.aiDot} />
+                <Text style={styles.aiActiveText}>Đang hoạt động</Text>
+              </View>
+            </View>
+          </>
+        )}
+
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f0',
+    backgroundColor: colors.background,
+  },
+  glow1: {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: colors.glowPrimary,
+    opacity: 0.55,
+  },
+  glow2: {
+    position: 'absolute',
+    bottom: -120,
+    left: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.glowAccent,
+    opacity: 0.55,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f4f0',
+    backgroundColor: colors.background,
+    gap: spacing.sm,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
   },
-  header: {
-    height: 160,
+
+  // Hero
+  hero: {
+    height: 190,
     overflow: 'hidden',
+    borderBottomLeftRadius: radii.xl,
+    borderBottomRightRadius: radii.xl,
   },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  headerOverlay: {
+  heroImage: { width: '100%', height: '100%' },
+  heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(21, 101, 192, 0.75)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.xxs,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 8,
+  heroTitle: {
+    fontSize: 26,
+    fontFamily: fonts.bold,
+    color: colors.white,
+    letterSpacing: -0.3,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#e3f2fd',
-    marginTop: 2,
-  },
-  content: {
-    flex: 1,
-  },
+
+  // Scroll
+  scroll: { flex: 1 },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
-  waterDisplay: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+
+  // Section Label
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    alignSelf: 'stretch',
   },
-  waterLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  waterValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1565C0',
-    marginTop: 4,
-  },
-  pumpStatusCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  pumpStatusLabel: {
-    fontSize: 15,
-    color: '#666',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  pumpBadge: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-  pumpOn: {
-    backgroundColor: '#E3F2FD',
-  },
-  pumpOff: {
-    backgroundColor: '#f5f5f5',
-  },
-  pumpBadgeText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1565C0',
-  },
-  controlCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  controlHeader: {
+
+  // MQTT Badge
+  mqttBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    alignSelf: 'center',
+    gap: spacing.xxs + 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs + 2,
+    borderRadius: radii.pill,
+    marginBottom: spacing.md,
   },
-  controlTitle: {
+  mqttOn: { backgroundColor: 'rgba(74,222,128,0.12)' },
+  mqttOff: { backgroundColor: 'rgba(239,68,68,0.12)' },
+  mqttDot: { width: 7, height: 7, borderRadius: 3.5 },
+  mqttText: { fontSize: 12, fontFamily: fonts.semibold, letterSpacing: 0.3 },
+
+  // Top Row
+  topRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  topCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xxs,
+    ...shadows.lift,
+  },
+  topCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accentBlueSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xxs,
+  },
+  topCardLabel: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: colors.textMuted,
+  },
+  topCardValue: {
+    fontSize: 20,
+    fontFamily: fonts.bold,
+    color: colors.accentBlue,
+    letterSpacing: -0.3,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    marginTop: spacing.xxs,
+  },
+  pillOn: { backgroundColor: colors.accentBlueSoft },
+  pillOff: { backgroundColor: colors.surfaceMuted },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+  pillText: { fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.3 },
+
+  // Mode Selector
+  modeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  modeBtn: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 10,
-  },
-  controlDesc: {
-    fontSize: 14,
-    color: '#888',
-    paddingLeft: 34,
-  },
-  manualCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  manualTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
-  timeInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    gap: spacing.xs,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  modeBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
+  },
+  modeBtnAi: {
+    backgroundColor: '#7C3AED',
+    borderColor: '#5B21B6',
+  },
+  modeBtnText: {
+    fontSize: 14,
+    fontFamily: fonts.semibold,
+    color: colors.textMuted,
+  },
+  modeBtnTextActive: {
+    color: colors.white,
+  },
+
+  // Card (thủ công)
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadows.lift,
+  },
+
+  // Time Row
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   timeLabel: {
-    fontSize: 15,
-    color: '#555',
     flex: 1,
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+  },
+  timeInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xxs,
   },
   timeInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    width: 80,
-    height: 44,
+    width: 52,
+    height: 40,
     textAlign: 'center',
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
   },
+  timeUnit: {
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: colors.textMuted,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: spacing.md,
+  },
+
+  // Buttons
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.sm,
   },
-  controlButton: {
+  btn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    height: 52,
-    gap: 8,
+    borderRadius: radii.md,
+    height: 48,
+    gap: spacing.xs,
   },
-  pumpOnButton: {
-    backgroundColor: '#1565C0',
-    shadowColor: '#1565C0',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  pumpOffButton: {
-    backgroundColor: '#c62828',
-    shadowColor: '#c62828',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  controlButtonText: {
+  btnOn: { backgroundColor: colors.primary },
+  btnOff: { backgroundColor: colors.danger },
+  btnDisabled: { opacity: 0.5 },
+  btnText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: fonts.semibold,
+    letterSpacing: 0.1,
+  },
+
+  // AI Card
+  aiCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: '#7C3AED30',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+    ...shadows.lift,
+  },
+  aiIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  aiTitle: {
+    fontSize: 18,
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  aiDesc: {
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  aiActiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs + 2,
+    backgroundColor: 'rgba(124,58,237,0.1)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs + 2,
+    borderRadius: radii.pill,
+    marginTop: spacing.xs,
+  },
+  aiDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#7C3AED',
+  },
+  aiActiveText: {
+    fontSize: 12,
+    fontFamily: fonts.semibold,
+    color: '#7C3AED',
   },
 });
 

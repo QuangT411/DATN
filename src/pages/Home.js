@@ -8,11 +8,49 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
-import { ref, onValue, query, limitToLast } from 'firebase/database';
+import { ref, onValue, query, limitToLast, get } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { useMqtt } from '../context/MqttContext';
+
+const SENSOR_CARDS = [
+  {
+    key: 'temperature',
+    label: 'Nhiệt độ',
+    icon: 'thermometer',
+    color: colors.accentSun,
+    bgColor: colors.accentSunSoft,
+    format: (v) => `${v?.toFixed(1) ?? '--'}°C`,
+  },
+  {
+    key: 'soil_moisture',
+    label: 'Độ ẩm đất',
+    icon: 'flower',
+    color: colors.primary,
+    bgColor: colors.primaryLight,
+    format: (v) => `${v?.toFixed(0) ?? '--'}%`,
+  },
+  {
+    key: 'light',
+    label: 'Ánh sáng',
+    icon: 'white-balance-sunny',
+    color: colors.accentSun,
+    bgColor: colors.accentSunSoft,
+    format: (v) => `${v?.toFixed(0) ?? '--'} lx`,
+  },
+  {
+    key: 'humidity_air',
+    label: 'Độ ẩm KK',
+    icon: 'water-percent',
+    color: colors.accentBlue,
+    bgColor: colors.accentBlueSoft,
+    format: (v) => `${v?.toFixed(1) ?? '--'}%`,
+  },
+];
 
 const Home = () => {
+  const { pumpStatus } = useMqtt(); // trạng thái bơm realtime từ MQTT
   const [data, setData] = useState({
     auto_mode: false,
     pump_status: false,
@@ -26,37 +64,56 @@ const Home = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const dataRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
-    const unsubscribe = onValue(dataRef, (snapshot) => {
+    // Lắng nghe dữ liệu cảm biến mới nhất
+    const sensorRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
+    const unsubSensor = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         let latest = {};
         snapshot.forEach((child) => {
           latest = child.val() || {};
         });
-        setData({
-          auto_mode: false,
-          pump_status: false,
-          temperature: latest.temperature ?? 0,
+        setData((prev) => ({
+          ...prev,
+          temperature:   latest.temperature  ?? 0,
           soil_moisture: latest.soil_percent ?? 0,
-          light: latest.light_lux ?? 0,
-          humidity_air: latest.humidity ?? 0,
-          water_liters: 0,
-        });
+          light:         latest.light_lux    ?? 0,
+          humidity_air:  latest.humidity     ?? 0,
+        }));
       }
       setLoading(false);
       setRefreshing(false);
     });
-    return () => unsubscribe();
+
+    // Lắng nghe trạng thái bơm & chế độ từ Firebase realtime
+    const currentRef = ref(database, 'current');
+    const unsubCurrent = onValue(currentRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        setData((prev) => ({
+          ...prev,
+          pump_status:  val.pump_status  ?? false,
+          auto_mode:    val.auto_mode    ?? false,
+          water_liters: val.water_liters ?? 0,
+        }));
+      }
+    });
+
+    return () => {
+      unsubSensor();
+      unsubCurrent();
+    };
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
+    // setRefreshing sẽ trigger lại vì onValue tự cập nhật realtime
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2E7D32" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
       </View>
     );
@@ -64,93 +121,113 @@ const Home = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Background glows */}
+      <View pointerEvents="none" style={styles.glow1} />
+      <View pointerEvents="none" style={styles.glow2} />
+
+      {/* Hero Banner */}
+      <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800&q=80' }}
-          style={styles.bannerImage}
+          source={{ uri: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=1400&q=80' }}
+          style={styles.heroImage}
         />
-        <View style={styles.headerOverlay}>
-          <MaterialCommunityIcons name="sprout" size={40} color="#fff" />
-          <Text style={styles.headerTitle}>Hệ thống tưới chính xác</Text>
-          <Text style={styles.headerSubtitle}>Smart Irrigation System</Text>
+        <View style={styles.heroOverlay}>
+          <View style={styles.heroBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveBadgeText}>LIVE</Text>
+          </View>
+          <Text style={styles.heroTitle}>Hệ thống tưới thông minh</Text>
         </View>
       </View>
 
       <ScrollView
-        style={styles.content}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2E7D32']} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
         }
       >
-        <View style={styles.statusGrid}>
-          <View style={[styles.statusCard, data.auto_mode ? styles.cardActive : styles.cardInactive]}>
+        {/* Status Cards */}
+        <Text style={styles.sectionLabel}>Trạng thái hệ thống</Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusCard, data.auto_mode ? styles.statusCardOn : styles.statusCardOff]}>
             <MaterialCommunityIcons
-              name={data.auto_mode ? 'autorenew' : 'autorenew'}
-              size={36}
-              color={data.auto_mode ? '#fff' : '#999'}
+              name="autorenew"
+              size={26}
+              color={data.auto_mode ? colors.white : colors.textMuted}
             />
-            <Text style={[styles.statusLabel, data.auto_mode && { color: '#fff' }]}>Auto Mode</Text>
-            <Text style={[styles.statusValue, data.auto_mode && { color: '#fff' }]}>
-              {data.auto_mode ? 'ON' : 'OFF'}
+            <Text style={[styles.statusCardTitle, data.auto_mode && { color: colors.white }]}>
+              Auto Mode
             </Text>
+            <View style={[styles.pill, data.auto_mode ? styles.pillOn : styles.pillOff]}>
+              <Text style={[styles.pillText, data.auto_mode ? styles.pillTextOn : styles.pillTextOff]}>
+                {data.auto_mode ? 'BẬT' : 'TẮT'}
+              </Text>
+            </View>
           </View>
 
-          <View style={[styles.statusCard, data.pump_status ? styles.cardActive : styles.cardInactive]}>
+          <View style={[styles.statusCard, pumpStatus ? styles.statusCardBlue : styles.statusCardOff]}>
             <MaterialCommunityIcons
-              name="water-pump"
-              size={36}
-              color={data.pump_status ? '#fff' : '#999'}
+              name={data.pump_status ? 'water-pump' : 'water-pump-off'}
+              size={26}
+              color={pumpStatus ? colors.white : colors.textMuted}
             />
-            <Text style={[styles.statusLabel, data.pump_status && { color: '#fff' }]}>Pump</Text>
-            <Text style={[styles.statusValue, data.pump_status && { color: '#fff' }]}>
-              {data.pump_status ? 'ON' : 'OFF'}
+            <Text style={[styles.statusCardTitle, pumpStatus && { color: colors.white }]}>
+              Máy bơm
             </Text>
+            <View style={[styles.pill, pumpStatus ? styles.pillBlue : styles.pillOff]}>
+              <Text style={[styles.pillText, pumpStatus ? styles.pillTextBlue : styles.pillTextOff]}>
+                {pumpStatus ? 'CHẠY' : 'TẮT'}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Cảm biến realtime</Text>
-
+        {/* Sensor Grid */}
+        <Text style={styles.sectionLabel}>Cảm biến realtime</Text>
         <View style={styles.sensorGrid}>
-          <View style={styles.sensorCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
-              <MaterialCommunityIcons name="thermometer" size={28} color="#E65100" />
+          {SENSOR_CARDS.map((s) => (
+            <View key={s.key} style={styles.sensorCard}>
+              <View style={[styles.sensorIcon, { backgroundColor: s.bgColor }]}>
+                <MaterialCommunityIcons name={s.icon} size={24} color={s.color} />
+              </View>
+              <Text style={styles.sensorLabel}>{s.label}</Text>
+              <Text style={[styles.sensorValue, { color: s.color }]}>
+                {s.format(data[s.key])}
+              </Text>
             </View>
-            <Text style={styles.sensorLabel}>Nhiệt độ</Text>
-            <Text style={styles.sensorValue}>{data.temperature?.toFixed(1) ?? '--'}°C</Text>
-          </View>
-
-          <View style={styles.sensorCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
-              <MaterialCommunityIcons name="flower" size={28} color="#2E7D32" />
-            </View>
-            <Text style={styles.sensorLabel}>Độ ẩm đất</Text>
-            <Text style={styles.sensorValue}>{data.soil_moisture?.toFixed(1) ?? '--'}%</Text>
-          </View>
-
-          <View style={styles.sensorCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#FFFDE7' }]}>
-              <MaterialCommunityIcons name="white-balance-sunny" size={28} color="#F57F17" />
-            </View>
-            <Text style={styles.sensorLabel}>Ánh sáng</Text>
-            <Text style={styles.sensorValue}>{data.light?.toFixed(0) ?? '--'} lux</Text>
-          </View>
-
-          <View style={styles.sensorCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
-              <MaterialCommunityIcons name="water-percent" size={28} color="#1565C0" />
-            </View>
-            <Text style={styles.sensorLabel}>Độ ẩm KK</Text>
-            <Text style={styles.sensorValue}>{data.humidity_air?.toFixed(1) ?? '--'}%</Text>
-          </View>
+          ))}
         </View>
 
+        {/* Water Card */}
+        <Text style={styles.sectionLabel}>Lượng nước</Text>
         <View style={styles.waterCard}>
-          <MaterialCommunityIcons name="cup-water" size={32} color="#1565C0" />
-          <Text style={styles.waterLabel}>Lượng nước đã tưới</Text>
-          <Text style={styles.waterValue}>{data.water_liters?.toFixed(2) ?? '0.00'} L</Text>
+          <View style={styles.waterLeft}>
+            <View style={styles.waterIconWrap}>
+              <MaterialCommunityIcons name="cup-water" size={26} color={colors.accentBlue} />
+            </View>
+            <View>
+              <Text style={styles.waterLabel}>Đã tưới hôm nay</Text>
+              <Text style={styles.waterValue}>
+                {data.water_liters?.toFixed(2) ?? '0.00'} L
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.waterBadge, pumpStatus ? styles.waterBadgeOn : styles.waterBadgeOff]}>
+            <View style={[styles.waterDot, { backgroundColor: pumpStatus ? colors.accentBlue : colors.textMuted }]} />
+            <Text style={[styles.waterBadgeText, { color: pumpStatus ? colors.accentBlue : colors.textMuted }]}>
+              {pumpStatus ? 'Đang tưới' : 'Đã tắt'}
+            </Text>
+          </View>
         </View>
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );
@@ -159,148 +236,250 @@ const Home = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f0',
+    backgroundColor: colors.background,
+  },
+  glow1: {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: colors.glowPrimary,
+    opacity: 0.6,
+  },
+  glow2: {
+    position: 'absolute',
+    bottom: -120,
+    left: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.glowAccent,
+    opacity: 0.6,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f4f0',
+    backgroundColor: colors.background,
+    gap: spacing.sm,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
   },
-  header: {
-    height: 180,
+
+  // Hero
+  hero: {
+    height: 200,
     overflow: 'hidden',
+    borderBottomLeftRadius: radii.xl,
+    borderBottomRightRadius: radii.xl,
   },
-  bannerImage: {
+  heroImage: {
     width: '100%',
     height: '100%',
   },
-  headerOverlay: {
+  heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(46, 125, 50, 0.75)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 8,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#e8f5e9',
-    marginTop: 2,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  statusGrid: {
+  heroBadge: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    alignItems: 'center',
+    gap: spacing.xxs,
+    marginBottom: spacing.xs,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#4ADE80',
+  },
+  liveBadgeText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: '#4ADE80',
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontFamily: fonts.bold,
+    color: colors.white,
+    lineHeight: 32,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+
+  // Scroll
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+
+  // Section Label
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+
+  // Status Cards
+  statusRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   statusCard: {
     flex: 1,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    gap: spacing.xs,
+    ...shadows.lift,
   },
-  cardActive: {
-    backgroundColor: '#2E7D32',
+  statusCardOff: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
-  cardInactive: {
-    backgroundColor: '#fff',
+  statusCardOn: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
   },
-  statusLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 8,
-    color: '#666',
+  statusCardBlue: {
+    backgroundColor: colors.accentBlue,
+    borderColor: '#155d8a',
   },
-  statusValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 4,
-    color: '#666',
+  statusCardTitle: {
+    fontSize: 13,
+    fontFamily: fonts.semibold,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+  pill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
   },
+  pillOn: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  pillBlue: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  pillOff: { backgroundColor: colors.surfaceMuted },
+  pillText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    letterSpacing: 0.5,
+  },
+  pillTextOn: { color: colors.white },
+  pillTextBlue: { color: colors.white },
+  pillTextOff: { color: colors.textMuted },
+
+  // Sensor Grid
   sensorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   sensorCard: {
     width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    flex: 0,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.lift,
   },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  sensorIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   sensorLabel: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: 11,
+    fontFamily: fonts.semibold,
+    color: colors.textMuted,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 3,
   },
   sensorValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 4,
+    fontSize: 20,
+    fontFamily: fonts.bold,
+    textAlign: 'center',
+    letterSpacing: -0.3,
   },
+
+  // Water Card
   waterCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadows.lift,
+  },
+  waterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  waterIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.accentBlueSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   waterLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: colors.textMuted,
   },
   waterValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1565C0',
-    marginTop: 4,
+    fontSize: 20,
+    fontFamily: fonts.bold,
+    color: colors.accentBlue,
+    letterSpacing: -0.3,
   },
+  waterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs + 2,
+    borderRadius: radii.pill,
+  },
+  waterBadgeOn: { backgroundColor: colors.accentBlueSoft },
+  waterBadgeOff: { backgroundColor: colors.surfaceMuted },
+  waterDot: { width: 6, height: 6, borderRadius: 3 },
+  waterBadgeText: { fontSize: 12, fontFamily: fonts.semibold },
 });
 
 export default Home;

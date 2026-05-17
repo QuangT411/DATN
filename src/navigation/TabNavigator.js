@@ -6,6 +6,7 @@ import Sensors from '../pages/Sensors';
 import WaterPump from '../pages/WaterPump';
 import Charts from '../pages/Charts';
 import Settings from '../pages/Settings';
+import { colors, fonts, radii } from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -28,25 +29,27 @@ const TabNavigator = () => {
           }
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2E7D32',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: colors.surface,
           borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          height: 60,
-          paddingBottom: 8,
+          borderTopColor: colors.border,
+          elevation: 10,
+          shadowColor: '#0F1A14',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
+          height: 66,
+          paddingBottom: 10,
           paddingTop: 8,
+          borderTopLeftRadius: radii.lg,
+          borderTopRightRadius: radii.lg,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontFamily: fonts.semibold,
         },
       })}
     >
