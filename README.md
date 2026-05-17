@@ -112,7 +112,3 @@ src/
 ```
 
 ---
-
-## 👤 Tác giả
-
-**QuangT411** — Đồ án tốt nghiệp (DATN)
