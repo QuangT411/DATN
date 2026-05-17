@@ -13,7 +13,7 @@
 | 🤖 Chế độ AI | AI Server tự phân tích cảm biến và kích hoạt bơm tự động |
 | 📊 Biểu đồ lịch sử | Xem dữ liệu cảm biến theo 7 / 14 / 30 ngày |
 | 🔐 Xác thực người dùng | Đăng ký / Đăng nhập qua Firebase Authentication |
-| 🔄 Cập nhật realtime | Trạng thái bơm cập nhật ngay trên UI qua MQTT (không cần F5) |
+| 🔄 Cập nhật realtime | Trạng thái bơm cập nhật ngay trên UI qua MQTT  |
 
 ---
 
