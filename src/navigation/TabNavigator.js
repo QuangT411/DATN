@@ -53,11 +53,11 @@ const TabNavigator = () => {
         },
       })}
     >
-      <Tab.Screen name="Home" component={Home} />
-      <Tab.Screen name="Sensors" component={Sensors} />
-      <Tab.Screen name="WaterPump" component={WaterPump} />
-      <Tab.Screen name="Charts" component={Charts} />
-      <Tab.Screen name="Settings" component={Settings} />
+      <Tab.Screen name="Home"      component={Home}      options={{ tabBarLabel: 'Trang chủ' }} />
+      <Tab.Screen name="Sensors"   component={Sensors}   options={{ tabBarLabel: 'Cảm biến' }} />
+      <Tab.Screen name="WaterPump" component={WaterPump} options={{ tabBarLabel: 'Máy bơm'  }} />
+      <Tab.Screen name="Charts"    component={Charts}    options={{ tabBarLabel: 'Biểu đồ'  }} />
+      <Tab.Screen name="Settings"  component={Settings}  options={{ tabBarLabel: 'Cài đặt'  }} />
     </Tab.Navigator>
   );
 };

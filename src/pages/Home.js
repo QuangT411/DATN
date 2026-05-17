@@ -8,7 +8,7 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
-import { ref, onValue, query, limitToLast, get } from 'firebase/database';
+import { ref, onValue, query, limitToLast } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
@@ -52,8 +52,6 @@ const SENSOR_CARDS = [
 const Home = () => {
   const { pumpStatus } = useMqtt(); // trạng thái bơm realtime từ MQTT
   const [data, setData] = useState({
-    auto_mode: false,
-    pump_status: false,
     temperature: 0,
     soil_moisture: 0,
     light: 0,
@@ -83,24 +81,8 @@ const Home = () => {
       setLoading(false);
       setRefreshing(false);
     });
-
-    // Lắng nghe trạng thái bơm & chế độ từ Firebase realtime
-    const currentRef = ref(database, 'current');
-    const unsubCurrent = onValue(currentRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        setData((prev) => ({
-          ...prev,
-          pump_status:  val.pump_status  ?? false,
-          auto_mode:    val.auto_mode    ?? false,
-          water_liters: val.water_liters ?? 0,
-        }));
-      }
-    });
-
     return () => {
       unsubSensor();
-      unsubCurrent();
     };
   }, []);
 
