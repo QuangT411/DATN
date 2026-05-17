@@ -1,30 +1,41 @@
 export const colors = {
-  background: '#F4F6F2',
-  surface: '#FFFFFF',
-  surfaceMuted: '#F0F3EE',
-  surfaceCard: '#FAFCF8',
-  primary: '#2F7D4E',
-  primaryDark: '#1D5B3A',
-  primarySoft: '#DDEFE3',
-  primaryLight: '#EAF5EE',
-  accentSun: '#C8842C',
-  accentSunSoft: '#FDF0E0',
-  accentBlue: '#1E6FA1',
-  accentBlueSoft: '#E3F0FA',
-  accentTeal: '#1B8A78',
-  accentTealSoft: '#E0F5F2',
-  textPrimary: '#1A2620',
-  textSecondary: '#556B5E',
-  textMuted: '#8A9E91',
-  border: '#E3E9DE',
-  borderStrong: '#C8D6C9',
-  white: '#FFFFFF',
-  danger: '#C13B32',
-  dangerSoft: '#FDECEA',
-  overlay: 'rgba(16, 42, 30, 0.62)',
-  overlayLight: 'rgba(16, 42, 30, 0.32)',
-  glowPrimary: '#D4EBD9',
-  glowAccent: '#EDE4CE',
+  // Nền tối
+  background:    '#0D1410',   // nền chính — đen xanh rất sâu
+  surface:       '#161E19',   // card / panel
+  surfaceMuted:  '#1C2820',   // input, row nền phụ
+  surfaceCard:   '#1A2420',   // card nâng cao hơn surface
+
+  // Brand xanh lá
+  primary:       '#3DBE6E',   // xanh lá sáng trên nền tối
+  primaryDark:   '#2E9456',
+  primarySoft:   '#1A3326',   // nền nhẹ cho badge/pill primary
+  primaryLight:  '#142B1F',
+
+  // Accent
+  accentSun:     '#F0A430',
+  accentSunSoft: '#2B2010',
+  accentBlue:    '#4BA6D8',
+  accentBlueSoft:'#0E2233',
+  accentTeal:    '#2DC4AE',
+  accentTealSoft:'#0C2722',
+
+  // Text
+  textPrimary:   '#E8F0EA',   // text chính — trắng xanh nhạt
+  textSecondary: '#90A898',   // text phụ
+  textMuted:     '#566B5E',   // placeholder, label mờ
+
+  // Border
+  border:        '#243029',
+  borderStrong:  '#2E3D34',
+
+  // Tiện ích
+  white:         '#FFFFFF',
+  danger:        '#E05C52',
+  dangerSoft:    '#2D1412',
+  overlay:       'rgba(0, 0, 0, 0.72)',
+  overlayLight:  'rgba(0, 0, 0, 0.40)',
+  glowPrimary:   '#1A3D26',   // glow xanh lá tối
+  glowAccent:    '#1A2A3D',   // glow xanh dương tối
 };
 
 export const fonts = {

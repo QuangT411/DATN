@@ -25,7 +25,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
+      <StatusBar style="light" backgroundColor="#0D1410" />
       <MqttProvider>
         <AppNavigator />
       </MqttProvider>
