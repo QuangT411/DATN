@@ -17,9 +17,9 @@ export const TOPICS = {
   MODE: 'irrigation/mode',           // payload: "manual" | "ai"
 
   // Điều khiển bơm (thủ công)
-  PUMP: 'irrigation/control/pump',   // payload: "1" (bật) | "0" (tắt)
+  PUMP: 'irrigation/control/pump',   // payload: "ON" (bật) | "OFF" (tắt)
   TIME: 'irrigation/control/time',   // payload: số giây (vd: "10")
 
   // Đọc trạng thái từ ESP32 (subscribe)
-  STATUS: 'irrigation/status/pump',  // payload: "1" | "0"
+  STATUS: 'irrigation/status/pump',  // payload: "ON" | "OFF"
 };
