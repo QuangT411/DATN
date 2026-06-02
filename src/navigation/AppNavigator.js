@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
 
@@ -16,11 +17,13 @@ const AppContent = () => {
 
 const AppNavigator = () => {
   return (
-    <NavigationContainer>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </NavigationContainer>
+    </ThemeProvider>
   );
 };
 

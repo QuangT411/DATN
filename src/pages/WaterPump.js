@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,16 @@ import {
 import { ref, onValue } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { fonts, radii, spacing, shadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { useMqtt } from '../context/MqttContext';
+import { useAuth } from '../context/AuthContext';
 import { TOPICS } from '../mqtt/mqttConfig';
 
 const WaterPump = () => {
+  const { colors } = useTheme();
   const { publish, controlPump, mode, setMode, connected } = useMqtt();
+  const { userData } = useAuth();
 
   const [data, setData] = useState({
     water_liters: 0,
@@ -31,7 +35,6 @@ const WaterPump = () => {
   const [manualTime, setManualTime] = useState('10');
   const [controlLoading, setControlLoading] = useState(false);
 
-  // Vẫn đọc trạng thái từ Firebase
   useEffect(() => {
     const currentRef = ref(database, 'current');
     const unsubscribe = onValue(currentRef, (snapshot) => {
@@ -48,7 +51,6 @@ const WaterPump = () => {
     return () => unsubscribe();
   }, []);
 
-  // Chuyển chế độ Manual / AI
   const handleSetMode = (newMode) => {
     if (!connected) {
       Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
@@ -65,7 +67,6 @@ const WaterPump = () => {
     }
   };
 
-  // Bật bơm thủ công
   const handlePumpOn = async () => {
     if (!connected) {
       Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
@@ -74,7 +75,7 @@ const WaterPump = () => {
     setControlLoading(true);
     try {
       const time = parseInt(manualTime) || 10;
-      const ok = controlPump(true, time); // gửi lệnh + cập nhật UI ngay
+      const ok = controlPump(true, time);
       if (ok) Alert.alert('Bật bơm', `Máy bơm đã bật. Thời gian: ${time} giây`);
     } catch (error) {
       Alert.alert('Lỗi', 'Không thể bật bơm: ' + error.message);
@@ -83,7 +84,6 @@ const WaterPump = () => {
     }
   };
 
-  // Tắt bơm thủ công
   const handlePumpOff = async () => {
     if (!connected) {
       Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
@@ -91,7 +91,7 @@ const WaterPump = () => {
     }
     setControlLoading(true);
     try {
-      const ok = controlPump(false); // gửi lệnh + cập nhật UI ngay
+      const ok = controlPump(false);
       if (ok) Alert.alert('Tắt bơm', 'Máy bơm đã tắt');
     } catch (error) {
       Alert.alert('Lỗi', 'Không thể tắt bơm: ' + error.message);
@@ -99,6 +99,31 @@ const WaterPump = () => {
       setControlLoading(false);
     }
   };
+
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  if (!userData?.role) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accentBlue} />
+        <Text style={styles.loadingText}>Đang kiểm tra quyền...</Text>
+      </View>
+    );
+  }
+
+  if (userData.role !== 'admin') {
+    return (
+      <View style={styles.restrictedContainer}>
+        <View style={styles.restrictedCard}>
+          <MaterialCommunityIcons name="shield-lock" size={42} color={colors.danger} />
+          <Text style={styles.restrictedTitle}>Không có quyền truy cập</Text>
+          <Text style={styles.restrictedText}>
+            Tài khoản của bạn không được phép điều khiển máy bơm.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -122,7 +147,7 @@ const WaterPump = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=1400&q=80' }}
+          source={{ uri: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1400&q=80' }}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -147,7 +172,6 @@ const WaterPump = () => {
 
         {/* Water + Status Row */}
         <View style={styles.topRow}>
-          {/* Water liters */}
           <View style={[styles.topCard, { flex: 1.2 }]}>
             <View style={styles.topCardIcon}>
               <MaterialCommunityIcons name="cup-water" size={22} color={colors.accentBlue} />
@@ -156,7 +180,6 @@ const WaterPump = () => {
             <Text style={styles.topCardValue}>{data.water_liters?.toFixed(2) ?? '0.00'} L</Text>
           </View>
 
-          {/* Pump status */}
           <View style={[styles.topCard, { flex: 1 }]}>
             <View style={[styles.topCardIcon, { backgroundColor: data.pump_status ? colors.accentBlueSoft : colors.surfaceMuted }]}>
               <MaterialCommunityIcons
@@ -214,7 +237,6 @@ const WaterPump = () => {
           <>
             <Text style={styles.sectionLabel}>Điều khiển thủ công</Text>
             <View style={styles.card}>
-              {/* Thời gian tưới */}
               <View style={styles.timeRow}>
                 <MaterialCommunityIcons name="timer-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.timeLabel}>Thời gian tưới</Text>
@@ -233,7 +255,6 @@ const WaterPump = () => {
 
               <View style={styles.divider} />
 
-              {/* Nút Bật / Tắt */}
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[styles.btn, styles.btnOn, controlLoading && styles.btnDisabled]}
@@ -295,7 +316,7 @@ const WaterPump = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -331,6 +352,38 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fonts.medium,
     color: colors.textSecondary,
+  },
+  restrictedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: spacing.lg,
+  },
+  restrictedCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+    ...shadows.lift,
+  },
+  restrictedTitle: {
+    fontSize: 18,
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  restrictedText: {
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 
   // Hero

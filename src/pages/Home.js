@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,46 +11,13 @@ import {
 import { ref, onValue, query, limitToLast } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { fonts, radii, spacing, shadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { useMqtt } from '../context/MqttContext';
 
-const SENSOR_CARDS = [
-  {
-    key: 'temperature',
-    label: 'Nhiệt độ',
-    icon: 'thermometer',
-    color: colors.accentSun,
-    bgColor: colors.accentSunSoft,
-    format: (v) => `${v?.toFixed(1) ?? '--'}°C`,
-  },
-  {
-    key: 'soil_moisture',
-    label: 'Độ ẩm đất',
-    icon: 'flower',
-    color: colors.primary,
-    bgColor: colors.primaryLight,
-    format: (v) => `${v?.toFixed(0) ?? '--'}%`,
-  },
-  {
-    key: 'light',
-    label: 'Ánh sáng',
-    icon: 'white-balance-sunny',
-    color: colors.accentSun,
-    bgColor: colors.accentSunSoft,
-    format: (v) => `${v?.toFixed(0) ?? '--'} lx`,
-  },
-  {
-    key: 'humidity_air',
-    label: 'Độ ẩm KK',
-    icon: 'water-percent',
-    color: colors.accentBlue,
-    bgColor: colors.accentBlueSoft,
-    format: (v) => `${v?.toFixed(1) ?? '--'}%`,
-  },
-];
-
 const Home = () => {
-  const { pumpStatus } = useMqtt(); // trạng thái bơm realtime từ MQTT
+  const { colors } = useTheme();
+  const { pumpStatus } = useMqtt();
   const [data, setData] = useState({
     temperature: 0,
     soil_moisture: 0,
@@ -61,8 +28,42 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const SENSOR_CARDS = useMemo(() => [
+    {
+      key: 'temperature',
+      label: 'Nhiệt độ',
+      icon: 'thermometer',
+      color: colors.accentSun,
+      bgColor: colors.accentSunSoft,
+      format: (v) => `${v?.toFixed(1) ?? '--'}°C`,
+    },
+    {
+      key: 'soil_moisture',
+      label: 'Độ ẩm đất',
+      icon: 'flower',
+      color: colors.primary,
+      bgColor: colors.primaryLight,
+      format: (v) => `${v?.toFixed(0) ?? '--'}%`,
+    },
+    {
+      key: 'light',
+      label: 'Ánh sáng',
+      icon: 'white-balance-sunny',
+      color: colors.accentSun,
+      bgColor: colors.accentSunSoft,
+      format: (v) => `${v?.toFixed(0) ?? '--'} lx`,
+    },
+    {
+      key: 'humidity_air',
+      label: 'Độ ẩm KK',
+      icon: 'water-percent',
+      color: colors.accentBlue,
+      bgColor: colors.accentBlueSoft,
+      format: (v) => `${v?.toFixed(1) ?? '--'}%`,
+    },
+  ], [colors]);
+
   useEffect(() => {
-    // Lắng nghe dữ liệu cảm biến mới nhất
     const sensorRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
     const unsubSensor = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -72,25 +73,24 @@ const Home = () => {
         });
         setData((prev) => ({
           ...prev,
-          temperature:   latest.temperature  ?? 0,
+          temperature: latest.temperature ?? 0,
           soil_moisture: latest.soil_percent ?? 0,
-          light:         latest.light_lux    ?? 0,
-          humidity_air:  latest.humidity     ?? 0,
+          light: latest.light_lux ?? 0,
+          humidity_air: latest.humidity ?? 0,
         }));
       }
       setLoading(false);
       setRefreshing(false);
     });
-    return () => {
-      unsubSensor();
-    };
+    return () => { unsubSensor(); };
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    // setRefreshing sẽ trigger lại vì onValue tự cập nhật realtime
     setTimeout(() => setRefreshing(false), 1000);
   };
+
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   if (loading) {
     return (
@@ -110,7 +110,7 @@ const Home = () => {
       {/* Hero Banner */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=1400&q=80' }}
+          source={{ uri: 'https://images.unsplash.com/photo-1710508946291-54a2c98472b1?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8aG9tZSUyMGljb258ZW58MHx8MHx8fDA%3D' }}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -215,7 +215,7 @@ const Home = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

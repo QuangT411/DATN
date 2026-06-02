@@ -86,7 +86,9 @@ const Register = ({ navigation }) => {
         {/* Banner */}
         <View style={styles.banner}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1472141521881-95d0e87e2e39?w=1400&q=80' }}
+            source={{
+              uri: 'https://images.unsplash.com/photo-1762330472502-83efbe1d4478?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            }}
             style={styles.bannerImage}
           />
           <View style={styles.bannerOverlay}>

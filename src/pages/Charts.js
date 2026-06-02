@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,18 +16,11 @@ import { ref, onValue, query, orderByKey, startAt, limitToLast } from 'firebase/
 import { database } from '../firebase/firebaseConfig';
 import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { fonts, radii, spacing, shadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const SENSOR_OPTIONS = [
-  { key: 'temperature', label: 'Nhiệt độ', icon: 'thermometer', color: colors.accentSun, bgColor: colors.accentSunSoft, unit: '°C' },
-  { key: 'humidity_air', label: 'Độ ẩm KK', icon: 'water-percent', color: colors.accentBlue, bgColor: colors.accentBlueSoft, unit: '%' },
-  { key: 'soil_moisture', label: 'Độ ẩm đất', icon: 'flower', color: colors.primary, bgColor: colors.primaryLight, unit: '%' },
-  { key: 'light', label: 'Ánh sáng', icon: 'white-balance-sunny', color: colors.accentSun, bgColor: colors.accentSunSoft, unit: ' lux' },
-];
-
-// Hàm lấy bớt dữ liệu để biểu đồ không bị lag (tối đa ~15-20 điểm)
 const downsampleData = (data, maxPoints = 15) => {
   if (data.length <= maxPoints) return data;
   const step = Math.ceil(data.length / maxPoints);
@@ -35,7 +28,6 @@ const downsampleData = (data, maxPoints = 15) => {
   for (let i = 0; i < data.length; i += step) {
     result.push(data[i]);
   }
-  // Đảm bảo luôn lấy điểm mới nhất
   if (result[result.length - 1] !== data[data.length - 1]) {
     result[result.length - 1] = data[data.length - 1];
   }
@@ -43,32 +35,34 @@ const downsampleData = (data, maxPoints = 15) => {
 };
 
 const Charts = () => {
+  const { colors } = useTheme();
   const [sensorHistory, setSensorHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sensorType, setSensorType] = useState('temperature');
-  
-  // Chế độ xem: 'latest' (15 điểm gần nhất) hoặc 'hours' (6h, 12h, 24h)
   const [viewMode, setViewMode] = useState('latest');
   const [hoursLimit, setHoursLimit] = useState(6);
-  
   const [modalVisible, setModalVisible] = useState(false);
+
+  const SENSOR_OPTIONS = useMemo(() => [
+    { key: 'temperature', label: 'Nhiệt độ', icon: 'thermometer', color: colors.accentSun, bgColor: colors.accentSunSoft, unit: '°C' },
+    { key: 'humidity_air', label: 'Độ ẩm KK', icon: 'water-percent', color: colors.accentBlue, bgColor: colors.accentBlueSoft, unit: '%' },
+    { key: 'soil_moisture', label: 'Độ ẩm đất', icon: 'flower', color: colors.primary, bgColor: colors.primaryLight, unit: '%' },
+    { key: 'light', label: 'Ánh sáng', icon: 'white-balance-sunny', color: colors.accentSun, bgColor: colors.accentSunSoft, unit: ' lux' },
+  ], [colors]);
 
   useEffect(() => {
     setLoading(true);
     let sensorQuery;
 
     if (viewMode === 'latest') {
-      // Mặc định 15 điểm gần nhất
       sensorQuery = query(
         ref(database, 'He_thong_tuoi/sensors/data'),
         orderByKey(),
         limitToLast(15)
       );
     } else {
-      // Xem theo giờ (6h, 12h, 24h)
       const currentSeconds = Math.floor(Date.now() / 1000);
       const startSeconds = currentSeconds - (hoursLimit * 60 * 60);
-
       sensorQuery = query(
         ref(database, 'He_thong_tuoi/sensors/data'),
         orderByKey(),
@@ -83,12 +77,11 @@ const Charts = () => {
           const val = child.val() || {};
           let timeLabel = '';
           if (val.timestamp) {
-            timeLabel = val.timestamp.substring(11, 16); // Chỉ lấy HH:mm
+            timeLabel = val.timestamp.substring(11, 16);
           } else {
             const date = new Date(parseInt(child.key) * 1000);
             timeLabel = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
           }
-          
           rawData.push({
             key: child.key,
             time: timeLabel,
@@ -98,8 +91,6 @@ const Charts = () => {
             light: val.light_lux ?? 0,
           });
         });
-        
-        // Giới hạn hiển thị để biểu đồ không bị rối khi xem 24h
         const sampledData = viewMode === 'hours' ? downsampleData(rawData, 15) : rawData;
         setSensorHistory(sampledData);
       } else {
@@ -116,7 +107,6 @@ const Charts = () => {
       return { labels: [''], datasets: [{ data: [0] }] };
     }
     const labels = sensorHistory.map((item, i) => {
-      // Ẩn bớt nhãn để tránh đè chữ
       if (sensorHistory.length > 6 && i % Math.ceil(sensorHistory.length / 4) !== 0 && i !== sensorHistory.length - 1) {
         return '';
       }
@@ -140,23 +130,25 @@ const Charts = () => {
     setModalVisible(false);
   };
 
-
-
   const activeSensor = SENSOR_OPTIONS.find((o) => o.key === sensorType);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const chartConfig = {
+  const chartConfig = useMemo(() => ({
     backgroundColor: colors.surface,
     backgroundGradientFrom: colors.surface,
     backgroundGradientTo: colors.surface,
     decimalPlaces: 1,
     color: (opacity = 1) => `rgba(47, 125, 78, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(85, 107, 94, ${opacity})`,
+    labelColor: (opacity = 1) => {
+      // Darker label in light mode
+      return `rgba(85, 107, 94, ${opacity})`;
+    },
     style: { borderRadius: radii.lg },
     propsForDots: {
       r: '5',
       strokeWidth: '2',
       stroke: colors.primary,
-      fill: colors.white,
+      fill: colors.surface,
     },
     propsForBackgroundLines: {
       strokeDasharray: '4,4',
@@ -165,7 +157,7 @@ const Charts = () => {
     fillShadowGradientFrom: colors.primary,
     fillShadowGradientTo: 'transparent',
     fillShadowGradientOpacity: 0.12,
-  };
+  }), [colors]);
 
   const chartW = screenWidth - spacing.lg * 2 - spacing.lg * 2;
 
@@ -177,7 +169,7 @@ const Charts = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1400&q=80' }}
+          source={{ uri: 'https://images.unsplash.com/photo-1634542984003-e0fb8e200e91?q=80&w=1169&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' }}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -196,13 +188,13 @@ const Charts = () => {
           <View>
             <Text style={styles.timeHeaderTitle}>Thời gian hiển thị</Text>
             <Text style={styles.timeHeaderSub}>
-              {viewMode === 'latest' 
-                ? '15 điểm gần nhất' 
+              {viewMode === 'latest'
+                ? '15 điểm gần nhất'
                 : `${hoursLimit} giờ qua`}
             </Text>
           </View>
-          <TouchableOpacity 
-            style={styles.moreButton} 
+          <TouchableOpacity
+            style={styles.moreButton}
             onPress={() => setModalVisible(true)}
             activeOpacity={0.7}
           >
@@ -242,10 +234,10 @@ const Charts = () => {
         <Text style={styles.sectionLabel}>Biểu đồ {activeSensor?.label}</Text>
         <View style={styles.chartCard}>
           {loading ? (
-             <View style={styles.loadingWrapper}>
-               <ActivityIndicator size="large" color={colors.primary} />
-               <Text style={styles.loadingText}>Đang lấy dữ liệu...</Text>
-             </View>
+            <View style={styles.loadingWrapper}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Đang lấy dữ liệu...</Text>
+            </View>
           ) : sensorHistory.length > 0 ? (
             <>
               <LineChart
@@ -274,8 +266,8 @@ const Charts = () => {
               <MaterialCommunityIcons name="chart-line-variant" size={52} color={colors.border} />
               <Text style={styles.emptyTitle}>Chưa có dữ liệu</Text>
               <Text style={styles.emptyDesc}>
-                {viewMode === 'latest' 
-                  ? 'Chưa có bản ghi nào' 
+                {viewMode === 'latest'
+                  ? 'Chưa có bản ghi nào'
                   : `Không có dữ liệu trong ${hoursLimit} giờ qua`}
               </Text>
             </View>
@@ -292,7 +284,7 @@ const Charts = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
@@ -303,6 +295,14 @@ const Charts = () => {
                 <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity style={styles.modalOption} onPress={handleSelectLatest}>
+              <MaterialCommunityIcons name="history" size={20} color={viewMode === 'latest' ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, viewMode === 'latest' && styles.modalOptionActive]}>
+                15 điểm gần nhất
+              </Text>
+              {viewMode === 'latest' && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(6)}>
               <MaterialCommunityIcons name="clock-outline" size={20} color={viewMode === 'hours' && hoursLimit === 6 ? colors.primary : colors.textSecondary} />
@@ -330,12 +330,11 @@ const Charts = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -569,36 +568,6 @@ const styles = StyleSheet.create({
   modalOptionActive: {
     color: colors.primary,
     fontFamily: fonts.bold,
-  },
-  customInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    gap: spacing.sm,
-  },
-  customInput: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    fontSize: 15,
-    fontFamily: fonts.medium,
-    color: colors.textPrimary,
-  },
-  customApplyBtn: {
-    backgroundColor: colors.primary,
-    height: 44,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: radii.sm,
-  },
-  customApplyText: {
-    color: '#fff',
-    fontFamily: fonts.bold,
-    fontSize: 14,
   },
 });
 

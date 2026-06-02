@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,19 +12,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
-
-const INFO_ROWS = [
-  { icon: 'shield-check', color: colors.primary, label: 'Trạng thái tài khoản', value: 'Đã xác thực email' },
-  { icon: 'cellphone-check', color: colors.accentBlue, label: 'Nền tảng', value: 'Android · iOS · Web' },
-  { icon: 'database-check', color: colors.accentSun, label: 'Firebase', value: 'Đã kết nối' },
-];
+import { fonts, radii, spacing, shadows } from '../styles/theme';
 
 // ─── Modal sửa thông tin ───────────────────────────────────────
-const EditProfileModal = ({ visible, onClose, userData, onSave }) => {
+const EditProfileModal = ({ visible, onClose, userData, onSave, colors }) => {
   const [username, setUsername] = useState(userData?.username || '');
   const [phone, setPhone] = useState(userData?.phone || '');
   const [saving, setSaving] = useState(false);
@@ -45,6 +41,8 @@ const EditProfileModal = ({ visible, onClose, userData, onSave }) => {
       setSaving(false);
     }
   };
+
+  const styles = createStyles(colors);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -99,7 +97,7 @@ const EditProfileModal = ({ visible, onClose, userData, onSave }) => {
 };
 
 // ─── Modal đổi mật khẩu ────────────────────────────────────────
-const ChangePasswordModal = ({ visible, onClose, onSave }) => {
+const ChangePasswordModal = ({ visible, onClose, onSave, colors }) => {
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -133,6 +131,8 @@ const ChangePasswordModal = ({ visible, onClose, onSave }) => {
       setSaving(false);
     }
   };
+
+  const styles = createStyles(colors);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -185,8 +185,15 @@ const ChangePasswordModal = ({ visible, onClose, onSave }) => {
 // ─── Màn hình Cài đặt chính ────────────────────────────────────
 const Settings = () => {
   const { user, userData, logout, updateUserProfile, changePassword } = useAuth();
+  const { isDark, toggleTheme, colors } = useTheme();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPwModal, setShowPwModal] = useState(false);
+
+  const INFO_ROWS = useMemo(() => [
+    { icon: 'shield-check', color: colors.primary, label: 'Trạng thái tài khoản', value: 'Đã xác thực email' },
+    { icon: 'cellphone-check', color: colors.accentBlue, label: 'Nền tảng', value: 'Android · iOS · Web' },
+    { icon: 'database-check', color: colors.accentSun, label: 'Firebase', value: 'Đã kết nối' },
+  ], [colors]);
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất không?', [
@@ -199,6 +206,8 @@ const Settings = () => {
     ]);
   };
 
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       <View pointerEvents="none" style={styles.glow1} />
@@ -207,7 +216,9 @@ const Settings = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?w=1400&q=80' }}
+          source={{
+            uri: 'https://images.unsplash.com/photo-1576097265487-97406fcfa5a6?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+          }}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -287,6 +298,30 @@ const Settings = () => {
           ))}
         </View>
 
+        {/* Giao diện */}
+        <Text style={styles.sectionLabel}>Giao diện</Text>
+        <View style={styles.themeCard}>
+          <View style={styles.themeRow}>
+            <View style={[styles.themeIconWrap, { backgroundColor: isDark ? '#1A2A3D' : '#FEF3DC' }]}>
+              <MaterialCommunityIcons
+                name={isDark ? 'weather-night' : 'white-balance-sunny'}
+                size={22}
+                color={isDark ? colors.accentBlue : colors.accentSun}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.themeTitle}>{isDark ? 'Chế độ tối' : 'Chế độ sáng'}</Text>
+              <Text style={styles.themeSub}>{isDark ? 'Nền đen, giảm mỏi mắt' : 'Nền sáng, dễ đọc ban ngày'}</Text>
+            </View>
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: '#D4E5DA', true: colors.primarySoft }}
+              thumbColor={isDark ? colors.primary : '#7A9A88'}
+            />
+          </View>
+        </View>
+
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
           <MaterialCommunityIcons name="logout" size={20} color="#fff" />
@@ -303,17 +338,19 @@ const Settings = () => {
         onClose={() => setShowEditModal(false)}
         userData={userData}
         onSave={updateUserProfile}
+        colors={colors}
       />
       <ChangePasswordModal
         visible={showPwModal}
         onClose={() => setShowPwModal(false)}
         onSave={changePassword}
+        colors={colors}
       />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   glow1: { position: 'absolute', top: -100, right: -100, width: 260, height: 260, borderRadius: 130, backgroundColor: colors.glowPrimary, opacity: 0.55 },
   glow2: { position: 'absolute', bottom: -120, left: -100, width: 280, height: 280, borderRadius: 140, backgroundColor: colors.glowAccent, opacity: 0.55 },
@@ -375,6 +412,13 @@ const styles = StyleSheet.create({
   input: { flex: 1, height: 46, fontSize: 15, fontFamily: fonts.medium, color: colors.textPrimary },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: radii.md, height: 50, gap: spacing.xs, marginTop: spacing.md },
   saveBtnText: { color: '#fff', fontSize: 15, fontFamily: fonts.bold },
+
+  // Theme toggle
+  themeCard: { backgroundColor: colors.surface, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg, overflow: 'hidden', ...shadows.lift },
+  themeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.sm },
+  themeIconWrap: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  themeTitle: { fontSize: 15, fontFamily: fonts.semibold, color: colors.textPrimary },
+  themeSub: { fontSize: 12, fontFamily: fonts.medium, color: colors.textMuted, marginTop: 2 },
 });
 
 export default Settings;

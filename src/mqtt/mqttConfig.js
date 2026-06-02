@@ -3,8 +3,8 @@ export const MQTT_CONFIG = {
   host: 'ba662f8f.ala.asia-southeast1.emqxsl.com',
   port: 8084,                        // WebSocket port
   protocol: 'wss',                   // 'ws' hoặc 'wss' (có SSL)
-  username: 'quang',         // ← Bạn cần tự điền User được tạo trong phần Authentication
-  password: '12052004',         // ← Bạn cần tự điền Pass được tạo trong phần Authentication
+  username: 'quang',         
+  password: '12052004',         
   clientId: `smartiot_app_${Math.random().toString(16).slice(2, 8)}`,
   keepalive: 60,
   reconnectPeriod: 3000,             // reconnect sau 3 giây nếu mất kết nối

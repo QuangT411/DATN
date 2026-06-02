@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,48 +11,11 @@ import {
 import { ref, onValue, query, limitToLast } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
-
-const SENSORS = [
-  {
-    key: 'light',
-    label: 'Ánh sáng',
-    icon: 'white-balance-sunny',
-    color: colors.accentSun,
-    bgColor: colors.accentSunSoft,
-    format: (v) => `${v?.toFixed(0) ?? '--'} lux`,
-    desc: 'Cường độ ánh sáng môi trường',
-  },
-  {
-    key: 'temperature',
-    label: 'Nhiệt độ',
-    icon: 'thermometer',
-    color: colors.accentSun,
-    bgColor: colors.accentSunSoft,
-    format: (v) => `${v?.toFixed(1) ?? '--'}°C`,
-    desc: 'Nhiệt độ không khí xung quanh',
-  },
-  {
-    key: 'humidity_air',
-    label: 'Độ ẩm không khí',
-    icon: 'water-percent',
-    color: colors.accentBlue,
-    bgColor: colors.accentBlueSoft,
-    format: (v) => `${v?.toFixed(1) ?? '--'}%`,
-    desc: 'Độ ẩm tương đối trong không khí',
-  },
-  {
-    key: 'soil_moisture',
-    label: 'Độ ẩm đất',
-    icon: 'flower',
-    color: colors.primary,
-    bgColor: colors.primaryLight,
-    format: (v) => `${v?.toFixed(0) ?? '--'}%`,
-    desc: 'Hàm lượng nước trong đất trồng',
-  },
-];
+import { fonts, radii, spacing, shadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 const Sensors = () => {
+  const { colors } = useTheme();
   const [data, setData] = useState({
     light: 0,
     temperature: 0,
@@ -61,6 +24,45 @@ const Sensors = () => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const SENSORS = useMemo(() => [
+    {
+      key: 'light',
+      label: 'Ánh sáng',
+      icon: 'white-balance-sunny',
+      color: colors.accentSun,
+      bgColor: colors.accentSunSoft,
+      format: (v) => `${v?.toFixed(0) ?? '--'} lux`,
+      desc: 'Cường độ ánh sáng môi trường',
+    },
+    {
+      key: 'temperature',
+      label: 'Nhiệt độ',
+      icon: 'thermometer',
+      color: colors.accentSun,
+      bgColor: colors.accentSunSoft,
+      format: (v) => `${v?.toFixed(1) ?? '--'}°C`,
+      desc: 'Nhiệt độ không khí xung quanh',
+    },
+    {
+      key: 'humidity_air',
+      label: 'Độ ẩm không khí',
+      icon: 'water-percent',
+      color: colors.accentBlue,
+      bgColor: colors.accentBlueSoft,
+      format: (v) => `${v?.toFixed(1) ?? '--'}%`,
+      desc: 'Độ ẩm tương đối trong không khí',
+    },
+    {
+      key: 'soil_moisture',
+      label: 'Độ ẩm đất',
+      icon: 'flower',
+      color: colors.primary,
+      bgColor: colors.primaryLight,
+      format: (v) => `${v?.toFixed(0) ?? '--'}%`,
+      desc: 'Hàm lượng nước trong đất trồng',
+    },
+  ], [colors]);
 
   useEffect(() => {
     const dataRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
@@ -85,6 +87,8 @@ const Sensors = () => {
 
   const onRefresh = () => setRefreshing(true);
 
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -102,7 +106,9 @@ const Sensors = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=1400&q=80' }}
+          source={{
+            uri: 'https://images.unsplash.com/photo-1599508266124-804fc6eecf09?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+          }}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -111,7 +117,6 @@ const Sensors = () => {
             <Text style={styles.liveBadgeText}>REALTIME</Text>
           </View>
           <Text style={styles.heroTitle}>Cảm biến</Text>
-
         </View>
       </View>
 
@@ -158,7 +163,7 @@ const Sensors = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -235,12 +240,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     letterSpacing: -0.3,
     textAlign: 'center',
-  },
-  heroSub: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 4,
   },
 
   // Scroll

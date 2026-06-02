@@ -1,14 +1,15 @@
-export const colors = {
+// ─── Dark Mode Colors ────────────────────────────────────────────
+export const darkColors = {
   // Nền tối
-  background:    '#0D1410',   // nền chính — đen xanh rất sâu
-  surface:       '#161E19',   // card / panel
-  surfaceMuted:  '#1C2820',   // input, row nền phụ
-  surfaceCard:   '#1A2420',   // card nâng cao hơn surface
+  background:    '#0D1410',
+  surface:       '#161E19',
+  surfaceMuted:  '#1C2820',
+  surfaceCard:   '#1A2420',
 
   // Brand xanh lá
-  primary:       '#3DBE6E',   // xanh lá sáng trên nền tối
+  primary:       '#3DBE6E',
   primaryDark:   '#2E9456',
-  primarySoft:   '#1A3326',   // nền nhẹ cho badge/pill primary
+  primarySoft:   '#1A3326',
   primaryLight:  '#142B1F',
 
   // Accent
@@ -20,9 +21,9 @@ export const colors = {
   accentTealSoft:'#0C2722',
 
   // Text
-  textPrimary:   '#E8F0EA',   // text chính — trắng xanh nhạt
-  textSecondary: '#90A898',   // text phụ
-  textMuted:     '#566B5E',   // placeholder, label mờ
+  textPrimary:   '#E8F0EA',
+  textSecondary: '#90A898',
+  textMuted:     '#566B5E',
 
   // Border
   border:        '#243029',
@@ -34,10 +35,58 @@ export const colors = {
   dangerSoft:    '#2D1412',
   overlay:       'rgba(0, 0, 0, 0.72)',
   overlayLight:  'rgba(0, 0, 0, 0.40)',
-  glowPrimary:   '#1A3D26',   // glow xanh lá tối
-  glowAccent:    '#1A2A3D',   // glow xanh dương tối
+  glowPrimary:   '#1A3D26',
+  glowAccent:    '#1A2A3D',
 };
 
+// ─── Light Mode Colors ───────────────────────────────────────────
+export const lightColors = {
+  // Nền sáng
+  background:    '#F2F7F4',
+  surface:       '#FFFFFF',
+  surfaceMuted:  '#EBF2EE',
+  surfaceCard:   '#F8FBF9',
+
+  // Brand xanh lá (giữ nguyên)
+  primary:       '#2EA85A',
+  primaryDark:   '#247A42',
+  primarySoft:   '#D4F0E1',
+  primaryLight:  '#E6F7EE',
+
+  // Accent
+  accentSun:     '#D48A1A',
+  accentSunSoft: '#FEF3DC',
+  accentBlue:    '#2E86BE',
+  accentBlueSoft:'#DBF0FF',
+  accentTeal:    '#1FA893',
+  accentTealSoft:'#D4F5F0',
+
+  // Text
+  textPrimary:   '#1A2E22',
+  textSecondary: '#4A6358',
+  textMuted:     '#8AA898',
+
+  // Border
+  border:        '#D0E5D8',
+  borderStrong:  '#B8D4C4',
+
+  // Tiện ích
+  white:         '#FFFFFF',
+  danger:        '#D63B31',
+  dangerSoft:    '#FDECEA',
+  overlay:       'rgba(0, 0, 0, 0.50)',
+  overlayLight:  'rgba(0, 0, 0, 0.25)',
+  glowPrimary:   '#C8EDD8',
+  glowAccent:    '#C8D8ED',
+};
+
+// Backward compat — giữ export `colors` = dark (cho Login/Register không dùng theme)
+export const colors = darkColors;
+
+// ─── Hàm lấy màu theo theme ─────────────────────────────────────
+export const getColors = (isDark) => isDark ? darkColors : lightColors;
+
+// ─── Typography ──────────────────────────────────────────────────
 export const fonts = {
   regular: 'Manrope_400Regular',
   medium: 'Manrope_500Medium',
@@ -45,6 +94,7 @@ export const fonts = {
   bold: 'Manrope_700Bold',
 };
 
+// ─── Border Radii ────────────────────────────────────────────────
 export const radii = {
   xs: 8,
   sm: 12,
@@ -55,6 +105,7 @@ export const radii = {
   pill: 999,
 };
 
+// ─── Spacing ─────────────────────────────────────────────────────
 export const spacing = {
   xxs: 4,
   xs: 8,
@@ -66,6 +117,7 @@ export const spacing = {
   xxxl: 48,
 };
 
+// ─── Shadows ─────────────────────────────────────────────────────
 export const shadows = {
   soft: {
     shadowColor: '#0A1A10',
