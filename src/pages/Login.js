@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, radii, spacing, shadows } from '../styles/theme';
 
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -25,6 +26,9 @@ const Login = ({ navigation }) => {
   const [resetEmail, setResetEmail] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const { login, resetPassword } = useAuth();
+  const { colors } = useTheme();
+
+  const styles = makeStyles(colors);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -35,7 +39,7 @@ const Login = ({ navigation }) => {
     try {
       await login(email.trim(), password);
     } catch (error) {
-      Alert.alert('Đăng nhập thất bại', error.message);
+      Alert.alert('Đăng nhập thất bại', 'Thông tin tài khoản hoặc mật khẩu không chính xác');
     } finally {
       setLoading(false);
     }
@@ -215,7 +219,7 @@ const Login = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

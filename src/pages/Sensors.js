@@ -154,7 +154,7 @@ const Sensors = () => {
         {/* Live badge */}
         <View style={styles.liveRow}>
           <View style={[styles.liveDotSmall, { backgroundColor: colors.accentTeal }]} />
-          <Text style={styles.liveText}>Dữ liệu cập nhật tự động theo Firebase</Text>
+          <Text style={styles.liveText}>Dữ liệu cập nhật tự động</Text>
         </View>
 
         <View style={{ height: spacing.xl }} />

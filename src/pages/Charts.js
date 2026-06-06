@@ -7,10 +7,10 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Image,
-  Dimensions,
   Modal,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { ref, onValue, query, orderByKey, startAt, limitToLast } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
@@ -18,8 +18,6 @@ import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts, radii, spacing, shadows } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 const downsampleData = (data, maxPoints = 15) => {
   if (data.length <= maxPoints) return data;
@@ -36,11 +34,12 @@ const downsampleData = (data, maxPoints = 15) => {
 
 const Charts = () => {
   const { colors } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const [sensorHistory, setSensorHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sensorType, setSensorType] = useState('temperature');
-  const [viewMode, setViewMode] = useState('latest');
-  const [hoursLimit, setHoursLimit] = useState(6);
+  const [hoursLimit, setHoursLimit] = useState(1);
+  const [isDayMode, setIsDayMode] = useState(false); // true khi chọn 7 hoặc 15 ngày
   const [modalVisible, setModalVisible] = useState(false);
 
   const SENSOR_OPTIONS = useMemo(() => [
@@ -52,23 +51,13 @@ const Charts = () => {
 
   useEffect(() => {
     setLoading(true);
-    let sensorQuery;
-
-    if (viewMode === 'latest') {
-      sensorQuery = query(
-        ref(database, 'He_thong_tuoi/sensors/data'),
-        orderByKey(),
-        limitToLast(15)
-      );
-    } else {
-      const currentSeconds = Math.floor(Date.now() / 1000);
-      const startSeconds = currentSeconds - (hoursLimit * 60 * 60);
-      sensorQuery = query(
-        ref(database, 'He_thong_tuoi/sensors/data'),
-        orderByKey(),
-        startAt(startSeconds.toString())
-      );
-    }
+    const currentSeconds = Math.floor(Date.now() / 1000);
+    const startSeconds = currentSeconds - (hoursLimit * 60 * 60);
+    const sensorQuery = query(
+      ref(database, 'He_thong_tuoi/sensors/data'),
+      orderByKey(),
+      startAt(startSeconds.toString())
+    );
 
     const unsubSensor = onValue(sensorQuery, (snapshot) => {
       if (snapshot.exists()) {
@@ -77,10 +66,15 @@ const Charts = () => {
           const val = child.val() || {};
           let timeLabel = '';
           if (val.timestamp) {
-            timeLabel = val.timestamp.substring(11, 16);
+            // Chế độ ngày: hiển thị dd/MM, chế độ giờ: hiển thị HH:mm
+            timeLabel = isDayMode
+              ? val.timestamp.substring(5, 10).replace('-', '/')
+              : val.timestamp.substring(11, 16);
           } else {
             const date = new Date(parseInt(child.key) * 1000);
-            timeLabel = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            timeLabel = isDayMode
+              ? `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`
+              : `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
           }
           rawData.push({
             key: child.key,
@@ -91,7 +85,8 @@ const Charts = () => {
             light: val.light_lux ?? 0,
           });
         });
-        const sampledData = viewMode === 'hours' ? downsampleData(rawData, 15) : rawData;
+        const maxPoints = isDayMode ? 20 : 15;
+        const sampledData = downsampleData(rawData, maxPoints);
         setSensorHistory(sampledData);
       } else {
         setSensorHistory([]);
@@ -100,7 +95,7 @@ const Charts = () => {
     });
 
     return () => unsubSensor();
-  }, [viewMode, hoursLimit]);
+  }, [hoursLimit, isDayMode]);
 
   const getChartData = () => {
     if (sensorHistory.length === 0) {
@@ -119,15 +114,17 @@ const Charts = () => {
     return { labels, datasets: [{ data: values }] };
   };
 
-  const handleSelectHours = (hours) => {
+  const handleSelectHours = (hours, dayMode = false) => {
     setHoursLimit(hours);
-    setViewMode('hours');
+    setIsDayMode(dayMode);
     setModalVisible(false);
   };
 
-  const handleSelectLatest = () => {
-    setViewMode('latest');
-    setModalVisible(false);
+  const getTimeLabel = () => {
+    if (hoursLimit === 1) return '1 giờ qua';
+    if (hoursLimit === 168) return '7 ngày qua';
+    if (hoursLimit === 360) return '15 ngày qua';
+    return `${hoursLimit} giờ qua`;
   };
 
   const activeSensor = SENSOR_OPTIONS.find((o) => o.key === sensorType);
@@ -159,7 +156,10 @@ const Charts = () => {
     fillShadowGradientOpacity: 0.12,
   }), [colors]);
 
-  const chartW = screenWidth - spacing.lg * 2 - spacing.lg * 2;
+  const chartW = useMemo(() => {
+    const appWidth = Platform.OS === 'web' ? Math.min(windowWidth, 480) : windowWidth;
+    return appWidth - spacing.lg * 4;
+  }, [windowWidth]);
 
   return (
     <View style={styles.container}>
@@ -187,11 +187,7 @@ const Charts = () => {
         <View style={styles.timeHeader}>
           <View>
             <Text style={styles.timeHeaderTitle}>Thời gian hiển thị</Text>
-            <Text style={styles.timeHeaderSub}>
-              {viewMode === 'latest'
-                ? '15 điểm gần nhất'
-                : `${hoursLimit} giờ qua`}
-            </Text>
+            <Text style={styles.timeHeaderSub}>{getTimeLabel()}</Text>
           </View>
           <TouchableOpacity
             style={styles.moreButton}
@@ -266,9 +262,7 @@ const Charts = () => {
               <MaterialCommunityIcons name="chart-line-variant" size={52} color={colors.border} />
               <Text style={styles.emptyTitle}>Chưa có dữ liệu</Text>
               <Text style={styles.emptyDesc}>
-                {viewMode === 'latest'
-                  ? 'Chưa có bản ghi nào'
-                  : `Không có dữ liệu trong ${hoursLimit} giờ qua`}
+                {`Không có dữ liệu trong ${getTimeLabel()}`}
               </Text>
             </View>
           )}
@@ -296,36 +290,52 @@ const Charts = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.modalOption} onPress={handleSelectLatest}>
-              <MaterialCommunityIcons name="history" size={20} color={viewMode === 'latest' ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, viewMode === 'latest' && styles.modalOptionActive]}>
-                15 điểm gần nhất
+            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(1)}>
+              <MaterialCommunityIcons name="clock-fast" size={20} color={hoursLimit === 1 ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, hoursLimit === 1 && styles.modalOptionActive]}>
+                1 giờ qua
               </Text>
-              {viewMode === 'latest' && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+              {hoursLimit === 1 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(6)}>
-              <MaterialCommunityIcons name="clock-outline" size={20} color={viewMode === 'hours' && hoursLimit === 6 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, viewMode === 'hours' && hoursLimit === 6 && styles.modalOptionActive]}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color={hoursLimit === 6 ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, hoursLimit === 6 && styles.modalOptionActive]}>
                 6 giờ qua
               </Text>
-              {viewMode === 'hours' && hoursLimit === 6 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+              {hoursLimit === 6 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(12)}>
-              <MaterialCommunityIcons name="clock-time-four-outline" size={20} color={viewMode === 'hours' && hoursLimit === 12 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, viewMode === 'hours' && hoursLimit === 12 && styles.modalOptionActive]}>
+              <MaterialCommunityIcons name="clock-time-four-outline" size={20} color={hoursLimit === 12 ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, hoursLimit === 12 && styles.modalOptionActive]}>
                 12 giờ qua
               </Text>
-              {viewMode === 'hours' && hoursLimit === 12 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+              {hoursLimit === 12 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(24)}>
-              <MaterialCommunityIcons name="update" size={20} color={viewMode === 'hours' && hoursLimit === 24 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, viewMode === 'hours' && hoursLimit === 24 && styles.modalOptionActive]}>
+              <MaterialCommunityIcons name="update" size={20} color={hoursLimit === 24 ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, hoursLimit === 24 && styles.modalOptionActive]}>
                 24 giờ qua
               </Text>
-              {viewMode === 'hours' && hoursLimit === 24 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+              {hoursLimit === 24 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(168, true)}>
+              <MaterialCommunityIcons name="calendar-week" size={20} color={hoursLimit === 168 ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, hoursLimit === 168 && styles.modalOptionActive]}>
+                7 ngày qua
+              </Text>
+              {hoursLimit === 168 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(360, true)}>
+              <MaterialCommunityIcons name="calendar-month" size={20} color={hoursLimit === 360 ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modalOptionText, hoursLimit === 360 && styles.modalOptionActive]}>
+                15 ngày qua
+              </Text>
+              {hoursLimit === 360 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

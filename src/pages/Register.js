@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing, shadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, radii, spacing, shadows } from '../styles/theme';
 
 const FIELDS = [
   { key: 'username', label: 'Họ và tên', icon: 'account-outline', placeholder: 'Nhập tên của bạn', type: 'default', capitalize: 'words' },
@@ -36,6 +37,9 @@ const Register = ({ navigation }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
+  const { colors } = useTheme();
+
+  const styles = makeStyles(colors);
 
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -175,7 +179,7 @@ const Register = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

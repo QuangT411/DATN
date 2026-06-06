@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, query, limitToLast } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts, radii, spacing, shadows } from '../styles/theme';
@@ -40,15 +40,28 @@ const WaterPump = () => {
     const unsubscribe = onValue(currentRef, (snapshot) => {
       if (snapshot.exists()) {
         const val = snapshot.val();
-        setData({
-          water_liters: val.water_liters || 0,
+        setData((prev) => ({
+          ...prev,
           pump_status: val.pump_status || false,
           auto_mode: val.auto_mode || false,
-        });
+        }));
       }
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const sensorRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
+    const unsubSensor = onValue(sensorRef, (snapshot) => {
+      if (snapshot.exists()) {
+        let latest = {};
+        snapshot.forEach((child) => { latest = child.val() || {}; });
+        setData((prev) => ({
+          ...prev,
+          water_liters: latest.total_volume_L ?? 0,
+        }));
+      }
+    });
+
+    return () => { unsubscribe(); unsubSensor(); };
   }, []);
 
   const handleSetMode = (newMode) => {

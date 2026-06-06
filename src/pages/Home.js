@@ -17,7 +17,8 @@ import { useMqtt } from '../context/MqttContext';
 
 const Home = () => {
   const { colors } = useTheme();
-  const { pumpStatus } = useMqtt();
+  const { pumpStatus, mode } = useMqtt();
+  const isAiMode = mode === 'ai';
   const [data, setData] = useState({
     temperature: 0,
     soil_moisture: 0,
@@ -77,6 +78,7 @@ const Home = () => {
           soil_moisture: latest.soil_percent ?? 0,
           light: latest.light_lux ?? 0,
           humidity_air: latest.humidity ?? 0,
+          water_liters: latest.total_volume_L ?? 0,
         }));
       }
       setLoading(false);
@@ -138,18 +140,18 @@ const Home = () => {
         {/* Status Cards */}
         <Text style={styles.sectionLabel}>Trạng thái hệ thống</Text>
         <View style={styles.statusRow}>
-          <View style={[styles.statusCard, data.auto_mode ? styles.statusCardOn : styles.statusCardOff]}>
+          <View style={[styles.statusCard, isAiMode ? styles.statusCardOn : styles.statusCardOff]}>
             <MaterialCommunityIcons
               name="autorenew"
               size={26}
-              color={data.auto_mode ? colors.white : colors.textMuted}
+              color={isAiMode ? colors.white : colors.textMuted}
             />
-            <Text style={[styles.statusCardTitle, data.auto_mode && { color: colors.white }]}>
+            <Text style={[styles.statusCardTitle, isAiMode && { color: colors.white }]}>
               Auto Mode
             </Text>
-            <View style={[styles.pill, data.auto_mode ? styles.pillOn : styles.pillOff]}>
-              <Text style={[styles.pillText, data.auto_mode ? styles.pillTextOn : styles.pillTextOff]}>
-                {data.auto_mode ? 'BẬT' : 'TẮT'}
+            <View style={[styles.pill, isAiMode ? styles.pillOn : styles.pillOff]}>
+              <Text style={[styles.pillText, isAiMode ? styles.pillTextOn : styles.pillTextOff]}>
+                {isAiMode ? 'BẬT' : 'TẮT'}
               </Text>
             </View>
           </View>
@@ -172,7 +174,7 @@ const Home = () => {
         </View>
 
         {/* Sensor Grid */}
-        <Text style={styles.sectionLabel}>Cảm biến realtime</Text>
+        <Text style={styles.sectionLabel}>Cảm biến </Text>
         <View style={styles.sensorGrid}>
           {SENSOR_CARDS.map((s) => (
             <View key={s.key} style={styles.sensorCard}>
@@ -195,7 +197,7 @@ const Home = () => {
               <MaterialCommunityIcons name="cup-water" size={26} color={colors.accentBlue} />
             </View>
             <View>
-              <Text style={styles.waterLabel}>Đã tưới hôm nay</Text>
+              <Text style={styles.waterLabel}>Đã tưới </Text>
               <Text style={styles.waterValue}>
                 {data.water_liters?.toFixed(2) ?? '0.00'} L
               </Text>
@@ -373,12 +375,12 @@ const createStyles = (colors) => StyleSheet.create({
   sensorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    width: '100%',
     marginBottom: spacing.lg,
   },
   sensorCard: {
     width: '48%',
-    flex: 0,
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     paddingVertical: spacing.md,
@@ -386,6 +388,7 @@ const createStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    marginBottom: spacing.sm,
     ...shadows.lift,
   },
   sensorIcon: {

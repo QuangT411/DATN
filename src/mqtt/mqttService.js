@@ -17,10 +17,10 @@ export const connect = (onConnect, onDisconnect, onError) => {
   const url = `${MQTT_CONFIG.protocol}://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
 
   client = mqtt.connect(url, {
-    clientId:       MQTT_CONFIG.clientId,
-    username:       MQTT_CONFIG.username,
-    password:       MQTT_CONFIG.password,
-    keepalive:      MQTT_CONFIG.keepalive,
+    clientId: MQTT_CONFIG.clientId,
+    username: MQTT_CONFIG.username,
+    password: MQTT_CONFIG.password,
+    keepalive: MQTT_CONFIG.keepalive,
     reconnectPeriod: MQTT_CONFIG.reconnectPeriod,
     connectTimeout: MQTT_CONFIG.connectTimeout,
     clean: true,
