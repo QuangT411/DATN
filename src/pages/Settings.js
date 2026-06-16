@@ -216,9 +216,7 @@ const Settings = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1576097265487-97406fcfa5a6?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-          }}
+          source={require("../../assets/icons/settings.png")}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -356,8 +354,8 @@ const createStyles = (colors) => StyleSheet.create({
   glow2: { position: 'absolute', bottom: -120, left: -100, width: 280, height: 280, borderRadius: 140, backgroundColor: colors.glowAccent, opacity: 0.55 },
 
   // Hero
-  hero: { height: 190, overflow: 'hidden', borderBottomLeftRadius: radii.xl, borderBottomRightRadius: radii.xl },
-  heroImage: { width: '100%', height: '100%' },
+  hero: { height: 220, overflow: 'hidden', borderBottomLeftRadius: radii.xl, borderBottomRightRadius: radii.xl, backgroundColor: '#0D1A12' },
+  heroImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: spacing.lg, gap: spacing.xxs },
   heroTitle: { fontSize: 26, fontFamily: fonts.bold, color: colors.white, letterSpacing: -0.3, marginTop: spacing.xs, textAlign: 'center' },
 

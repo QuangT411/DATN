@@ -112,7 +112,7 @@ const Home = () => {
       {/* Hero Banner */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1710508946291-54a2c98472b1?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8aG9tZSUyMGljb258ZW58MHx8MHx8fDA%3D' }}
+          source={require("../../assets/icons/home.png")}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -156,18 +156,18 @@ const Home = () => {
             </View>
           </View>
 
-          <View style={[styles.statusCard, pumpStatus ? styles.statusCardBlue : styles.statusCardOff]}>
+          <View style={[styles.statusCard, pumpStatus === null ? styles.statusCardOff : pumpStatus ? styles.statusCardBlue : styles.statusCardOff]}>
             <MaterialCommunityIcons
-              name={data.pump_status ? 'water-pump' : 'water-pump-off'}
+              name={pumpStatus ? 'water-pump' : 'water-pump-off'}
               size={26}
-              color={pumpStatus ? colors.white : colors.textMuted}
+              color={pumpStatus === null ? colors.textMuted : pumpStatus ? colors.white : colors.textMuted}
             />
             <Text style={[styles.statusCardTitle, pumpStatus && { color: colors.white }]}>
               Máy bơm
             </Text>
-            <View style={[styles.pill, pumpStatus ? styles.pillBlue : styles.pillOff]}>
-              <Text style={[styles.pillText, pumpStatus ? styles.pillTextBlue : styles.pillTextOff]}>
-                {pumpStatus ? 'CHẠY' : 'TẮT'}
+            <View style={[styles.pill, pumpStatus === null ? styles.pillOff : pumpStatus ? styles.pillBlue : styles.pillOff]}>
+              <Text style={[styles.pillText, pumpStatus === null ? styles.pillTextOff : pumpStatus ? styles.pillTextBlue : styles.pillTextOff]}>
+                {pumpStatus === null ? 'Đang chờ...' : pumpStatus ? 'CHẠY' : 'TẮT'}
               </Text>
             </View>
           </View>
@@ -203,10 +203,10 @@ const Home = () => {
               </Text>
             </View>
           </View>
-          <View style={[styles.waterBadge, pumpStatus ? styles.waterBadgeOn : styles.waterBadgeOff]}>
-            <View style={[styles.waterDot, { backgroundColor: pumpStatus ? colors.accentBlue : colors.textMuted }]} />
-            <Text style={[styles.waterBadgeText, { color: pumpStatus ? colors.accentBlue : colors.textMuted }]}>
-              {pumpStatus ? 'Đang tưới' : 'Đã tắt'}
+          <View style={[styles.waterBadge, pumpStatus === null ? styles.waterBadgeOff : pumpStatus ? styles.waterBadgeOn : styles.waterBadgeOff]}>
+            <View style={[styles.waterDot, { backgroundColor: pumpStatus === null ? colors.textMuted : pumpStatus ? colors.accentBlue : colors.textMuted }]} />
+            <Text style={[styles.waterBadgeText, { color: pumpStatus === null ? colors.textMuted : pumpStatus ? colors.accentBlue : colors.textMuted }]}>
+              {pumpStatus === null ? 'Đang chờ...' : pumpStatus ? 'Đang tưới' : 'Đã tắt'}
             </Text>
           </View>
         </View>
@@ -257,14 +257,16 @@ const createStyles = (colors) => StyleSheet.create({
 
   // Hero
   hero: {
-    height: 200,
+    height: 220,
     overflow: 'hidden',
     borderBottomLeftRadius: radii.xl,
     borderBottomRightRadius: radii.xl,
+    backgroundColor: '#0D1A12',
   },
   heroImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'contain',
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,

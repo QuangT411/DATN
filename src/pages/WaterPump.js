@@ -23,32 +23,17 @@ import { TOPICS } from '../mqtt/mqttConfig';
 
 const WaterPump = () => {
   const { colors } = useTheme();
-  const { publish, controlPump, mode, setMode, connected } = useMqtt();
+  const { publish, controlPump, mode, setMode, connected, pumpStatus } = useMqtt();
   const { userData } = useAuth();
 
   const [data, setData] = useState({
     water_liters: 0,
-    pump_status: false,
-    auto_mode: false,
   });
   const [loading, setLoading] = useState(true);
   const [manualTime, setManualTime] = useState('10');
   const [controlLoading, setControlLoading] = useState(false);
 
   useEffect(() => {
-    const currentRef = ref(database, 'current');
-    const unsubscribe = onValue(currentRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        setData((prev) => ({
-          ...prev,
-          pump_status: val.pump_status || false,
-          auto_mode: val.auto_mode || false,
-        }));
-      }
-      setLoading(false);
-    });
-
     const sensorRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
     const unsubSensor = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -59,9 +44,10 @@ const WaterPump = () => {
           water_liters: latest.total_volume_L ?? 0,
         }));
       }
+      setLoading(false);
     });
 
-    return () => { unsubscribe(); unsubSensor(); };
+    return () => { unsubSensor(); };
   }, []);
 
   const handleSetMode = (newMode) => {
@@ -160,7 +146,7 @@ const WaterPump = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1400&q=80' }}
+          source={require("../../assets/icons/water-pump.png")}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -194,18 +180,18 @@ const WaterPump = () => {
           </View>
 
           <View style={[styles.topCard, { flex: 1 }]}>
-            <View style={[styles.topCardIcon, { backgroundColor: data.pump_status ? colors.accentBlueSoft : colors.surfaceMuted }]}>
+            <View style={[styles.topCardIcon, { backgroundColor: pumpStatus === null ? colors.surfaceMuted : pumpStatus ? colors.accentBlueSoft : colors.surfaceMuted }]}>
               <MaterialCommunityIcons
-                name={data.pump_status ? 'water-pump' : 'water-pump-off'}
+                name={pumpStatus ? 'water-pump' : 'water-pump-off'}
                 size={22}
-                color={data.pump_status ? colors.accentBlue : colors.textMuted}
+                color={pumpStatus === null ? colors.textMuted : pumpStatus ? colors.accentBlue : colors.textMuted}
               />
             </View>
             <Text style={styles.topCardLabel}>Máy bơm</Text>
-            <View style={[styles.statusPill, data.pump_status ? styles.pillOn : styles.pillOff]}>
-              <View style={[styles.pillDot, { backgroundColor: data.pump_status ? colors.accentBlue : colors.textMuted }]} />
-              <Text style={[styles.pillText, { color: data.pump_status ? colors.accentBlue : colors.textMuted }]}>
-                {data.pump_status ? 'CHẠY' : 'TẮT'}
+            <View style={[styles.statusPill, pumpStatus === null ? styles.pillOff : pumpStatus ? styles.pillOn : styles.pillOff]}>
+              <View style={[styles.pillDot, { backgroundColor: pumpStatus === null ? colors.textMuted : pumpStatus ? colors.accentBlue : colors.textMuted }]} />
+              <Text style={[styles.pillText, { color: pumpStatus === null ? colors.textMuted : pumpStatus ? colors.accentBlue : colors.textMuted }]}>
+                {pumpStatus === null ? 'Đang chờ...' : pumpStatus ? 'CHẠY' : 'TẮT'}
               </Text>
             </View>
           </View>
@@ -401,12 +387,13 @@ const createStyles = (colors) => StyleSheet.create({
 
   // Hero
   hero: {
-    height: 190,
+    height: 220,
     overflow: 'hidden',
     borderBottomLeftRadius: radii.xl,
     borderBottomRightRadius: radii.xl,
+    backgroundColor: '#0D1A12',
   },
-  heroImage: { width: '100%', height: '100%' },
+  heroImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.overlay,

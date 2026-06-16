@@ -1,15 +1,13 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import * as mqttService from '../mqtt/mqttService';
 import { TOPICS } from '../mqtt/mqttConfig';
-import { ref, update } from 'firebase/database';
-import { database } from '../firebase/firebaseConfig';
 
 const MqttContext = createContext(null);
 
 export const MqttProvider = ({ children }) => {
   const [connected, setConnected] = useState(false);
   const [mode, setModeState] = useState('manual');
-  const [pumpStatus, setPumpStatus] = useState(false); // trạng thái bơm realtime
+  const [pumpStatus, setPumpStatus] = useState(null); // null = chưa nhận từ broker
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -17,11 +15,10 @@ export const MqttProvider = ({ children }) => {
       () => {
         setConnected(true);
 
-        // Lắng nghe phản hồi thực tế từ ESP32 (khi có phần cứng)
+        // Lắng nghe trạng thái bơm thực tế từ ESP32 qua MQTT broker
         mqttService.subscribe(TOPICS.STATUS, (message) => {
           const isOn = message === 'ON';
           setPumpStatus(isOn);
-          update(ref(database, 'current'), { pump_status: isOn }).catch(() => { });
           console.log(`[MqttContext] Trạng thái bơm từ ESP32: ${isOn ? 'BẬT' : 'TẮT'}`);
         });
       },
@@ -42,13 +39,13 @@ export const MqttProvider = ({ children }) => {
 
   /**
    * Điều khiển bơm — cập nhật UI ngay mà không chờ ESP32 phản hồi
-   * @param {boolean} isOn - true = bật, false = tắt
+   * @param {boolean} isOn    - true = bật, false = tắt
    * @param {number}  seconds - số giây hẹn giờ (chỉ dùng khi bật)
    */
   const controlPump = useCallback((isOn, seconds = 0) => {
     if (!mqttService.isConnected()) return false;
 
-    // Xóa bộ đếm thời gian cũ nếu đang có lệnh mới can thiệp
+    // Xóa bộ đếm thời gian cũ nếu có lệnh mới can thiệp
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -57,29 +54,28 @@ export const MqttProvider = ({ children }) => {
     if (isOn && seconds > 0) {
       mqttService.publish(TOPICS.TIME, String(seconds));
 
-      // Hẹn giờ để App tự động tắt giao diện và gửi lệnh Tắt
+      // Hẹn giờ: gửi lệnh Tắt sau N giây, UI sẽ cập nhật khi ESP32 trả về
       timerRef.current = setTimeout(() => {
         mqttService.publish(TOPICS.PUMP, 'OFF');
-        setPumpStatus(false);
-        update(ref(database, 'current'), { pump_status: false }).catch(() => { });
         console.log('[MqttContext] Hết thời gian, App tự động tắt bơm');
       }, seconds * 1000);
     }
+
     mqttService.publish(TOPICS.PUMP, isOn ? 'ON' : 'OFF');
 
-    // Cập nhật trạng thái ngay lập tức (optimistic update)
-    setPumpStatus(isOn);
-    update(ref(database, 'current'), { pump_status: isOn }).catch(() => { });
-    console.log(`[MqttContext] Điều khiển bơm: ${isOn ? 'BẬT' : 'TẮT'}`);
+    // Không cập nhật UI ngay — chờ ESP32 publish lại qua irrigation/status/pump
+    console.log(`[MqttContext] Đã gửi lệnh bơm: ${isOn ? 'BẬT' : 'TẮT'}, chờ ESP32 xác nhận`);
     return true;
   }, []);
 
-  /** Đổi chế độ: 'manual' | 'ai' */
+  /**
+   * Đổi chế độ hoạt động: 'manual' | 'ai'
+   * — mode được lưu trong local state, cập nhật khi người dùng bấm nút trong WaterPump
+   */
   const setMode = useCallback((newMode) => {
     const success = mqttService.publish(TOPICS.MODE, newMode);
     if (success) {
       setModeState(newMode);
-      update(ref(database, 'current'), { auto_mode: newMode === 'ai' }).catch(() => { });
     }
     return success;
   }, []);

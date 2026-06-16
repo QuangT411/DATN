@@ -106,9 +106,7 @@ const Sensors = () => {
       {/* Hero */}
       <View style={styles.hero}>
         <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1599508266124-804fc6eecf09?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-          }}
+          source={require("../../assets/icons/soil-moisture-sensor.png")}
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
@@ -203,12 +201,13 @@ const createStyles = (colors) => StyleSheet.create({
 
   // Hero
   hero: {
-    height: 190,
+    height: 220,
     overflow: 'hidden',
     borderBottomLeftRadius: radii.xl,
     borderBottomRightRadius: radii.xl,
+    backgroundColor: '#0D1A12',
   },
-  heroImage: { width: '100%', height: '100%' },
+  heroImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.overlay,
