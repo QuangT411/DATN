@@ -101,8 +101,7 @@ Sau đó quét QR code bằng **Expo Go** trên điện thoại.
 
 ```
 src/
-├── components/       # UI components tái sử dụng (SensorCard, WaterCard, PumpControl...)
-├── context/          # React Context (AuthContext, MqttContext)
+├── context/          # React Context (AuthContext, MqttContext, ThemeContext)
 ├── firebase/         # Firebase config
 ├── mqtt/             # MQTT config & service
 ├── navigation/       # Cấu hình điều hướng

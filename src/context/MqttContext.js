@@ -1,14 +1,26 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as mqttService from '../mqtt/mqttService';
 import { TOPICS } from '../mqtt/mqttConfig';
 
 const MqttContext = createContext(null);
 
+const MODE_KEY = '@pump_mode';
+
 export const MqttProvider = ({ children }) => {
   const [connected, setConnected] = useState(false);
   const [mode, setModeState] = useState('manual');
-  const [pumpStatus, setPumpStatus] = useState(null); // null = chưa nhận từ broker
+  const [pumpStatus, setPumpStatus] = useState(null);
   const timerRef = useRef(null);
+
+  // Khôi phục mode đã lưu khi khởi động app
+  useEffect(() => {
+    AsyncStorage.getItem(MODE_KEY).then((saved) => {
+      if (saved === 'ai' || saved === 'manual') {
+        setModeState(saved);
+      }
+    }).catch(() => { });
+  }, []);
 
   useEffect(() => {
     mqttService.connect(
@@ -70,12 +82,13 @@ export const MqttProvider = ({ children }) => {
 
   /**
    * Đổi chế độ hoạt động: 'manual' | 'ai'
-   * — mode được lưu trong local state, cập nhật khi người dùng bấm nút trong WaterPump
+   * — mode được lưu cả trong AsyncStorage để giữ sau khi thoát app
    */
   const setMode = useCallback((newMode) => {
     const success = mqttService.publish(TOPICS.MODE, newMode);
     if (success) {
       setModeState(newMode);
+      AsyncStorage.setItem(MODE_KEY, newMode).catch(() => { });
     }
     return success;
   }, []);

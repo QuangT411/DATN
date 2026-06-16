@@ -12,7 +12,8 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import { ref, onValue, query, orderByKey, startAt, limitToLast } from 'firebase/database';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { ref, onValue, query, orderByKey, startAt, endAt } from 'firebase/database';
 import { database } from '../firebase/firebaseConfig';
 import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -38,26 +39,54 @@ const Charts = () => {
   const [sensorHistory, setSensorHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sensorType, setSensorType] = useState('temperature');
+
+  // Time selection state
+  const [viewMode, setViewMode] = useState('recent'); // 'recent' | 'date'
   const [hoursLimit, setHoursLimit] = useState(1);
-  const [isDayMode, setIsDayMode] = useState(false); // true khi chọn 7 hoặc 15 ngày
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Modal / Picker state
   const [modalVisible, setModalVisible] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pendingDate, setPendingDate] = useState(new Date());
 
   const SENSOR_OPTIONS = useMemo(() => [
-    { key: 'temperature', label: 'Nhiệt độ', icon: 'thermometer', color: colors.accentSun, bgColor: colors.accentSunSoft, unit: '°C' },
-    { key: 'humidity_air', label: 'Độ ẩm KK', icon: 'water-percent', color: colors.accentBlue, bgColor: colors.accentBlueSoft, unit: '%' },
-    { key: 'soil_moisture', label: 'Độ ẩm đất', icon: 'flower', color: colors.primary, bgColor: colors.primaryLight, unit: '%' },
-    { key: 'light', label: 'Ánh sáng', icon: 'white-balance-sunny', color: colors.accentSun, bgColor: colors.accentSunSoft, unit: ' lux' },
+    { key: 'temperature', label: 'Nhiệt độ', icon: 'thermometer', color: colors.accentSun, unit: '°C' },
+    { key: 'humidity_air', label: 'Độ ẩm KK', icon: 'water-percent', color: colors.accentBlue, unit: '%' },
+    { key: 'soil_moisture', label: 'Độ ẩm đất', icon: 'flower', color: colors.primary, unit: '%' },
+    { key: 'light', label: 'Ánh sáng', icon: 'white-balance-sunny', color: colors.accentSun, unit: ' lux' },
   ], [colors]);
 
   useEffect(() => {
     setLoading(true);
-    const currentSeconds = Math.floor(Date.now() / 1000);
-    const startSeconds = currentSeconds - (hoursLimit * 60 * 60);
-    const sensorQuery = query(
-      ref(database, 'He_thong_tuoi/sensors/data'),
-      orderByKey(),
-      startAt(startSeconds.toString())
-    );
+    let sensorQuery;
+
+    if (viewMode === 'date') {
+      // Lấy dữ liệu cho ngày đã chọn (00:00:00 → 23:59:59)
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const startSec = Math.floor(startOfDay.getTime() / 1000);
+      const endSec = Math.floor(endOfDay.getTime() / 1000);
+
+      sensorQuery = query(
+        ref(database, 'He_thong_tuoi/sensors/data'),
+        orderByKey(),
+        startAt(startSec.toString()),
+        endAt(endSec.toString())
+      );
+    } else {
+      // Chế độ xem gần đây
+      const currentSeconds = Math.floor(Date.now() / 1000);
+      const startSeconds = currentSeconds - hoursLimit * 60 * 60;
+      sensorQuery = query(
+        ref(database, 'He_thong_tuoi/sensors/data'),
+        orderByKey(),
+        startAt(startSeconds.toString())
+      );
+    }
 
     const unsubSensor = onValue(sensorQuery, (snapshot) => {
       if (snapshot.exists()) {
@@ -66,15 +95,10 @@ const Charts = () => {
           const val = child.val() || {};
           let timeLabel = '';
           if (val.timestamp) {
-            // Chế độ ngày: hiển thị dd/MM, chế độ giờ: hiển thị HH:mm
-            timeLabel = isDayMode
-              ? val.timestamp.substring(5, 10).replace('-', '/')
-              : val.timestamp.substring(11, 16);
+            timeLabel = val.timestamp.substring(11, 16);
           } else {
             const date = new Date(parseInt(child.key) * 1000);
-            timeLabel = isDayMode
-              ? `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`
-              : `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            timeLabel = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
           }
           rawData.push({
             key: child.key,
@@ -85,8 +109,7 @@ const Charts = () => {
             light: val.light_lux ?? 0,
           });
         });
-        const maxPoints = isDayMode ? 20 : 15;
-        const sampledData = downsampleData(rawData, maxPoints);
+        const sampledData = downsampleData(rawData, 15);
         setSensorHistory(sampledData);
       } else {
         setSensorHistory([]);
@@ -95,7 +118,7 @@ const Charts = () => {
     });
 
     return () => unsubSensor();
-  }, [hoursLimit, isDayMode]);
+  }, [hoursLimit, viewMode, selectedDate]);
 
   const getChartData = () => {
     if (sensorHistory.length === 0) {
@@ -114,16 +137,61 @@ const Charts = () => {
     return { labels, datasets: [{ data: values }] };
   };
 
-  const handleSelectHours = (hours, dayMode = false) => {
+  const handleSelectHours = (hours) => {
+    setViewMode('recent');
     setHoursLimit(hours);
-    setIsDayMode(dayMode);
+    setModalVisible(false);
+    setShowDatePicker(false);
+  };
+
+  const handleOpenDatePicker = () => {
+    setPendingDate(selectedDate);
+    setShowDatePicker(true);
+  };
+
+  const handleDateChange = (event, date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (event.type === 'set' && date) {
+        setSelectedDate(date);
+        setViewMode('date');
+        setModalVisible(false);
+      }
+    } else {
+      if (date) setPendingDate(date);
+    }
+  };
+
+  const handleConfirmDate = () => {
+    setSelectedDate(pendingDate);
+    setViewMode('date');
+    setShowDatePicker(false);
     setModalVisible(false);
   };
 
+  const handleCancelDate = () => {
+    setShowDatePicker(false);
+  };
+
+  const formatDateVN = (date) => {
+    const d = date.getDate().toString().padStart(2, '0');
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
+  };
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  };
+
   const getTimeLabel = () => {
+    if (viewMode === 'date') {
+      return isToday(selectedDate) ? `Hôm nay (${formatDateVN(selectedDate)})` : formatDateVN(selectedDate);
+    }
     if (hoursLimit === 1) return '1 giờ qua';
-    if (hoursLimit === 168) return '7 ngày qua';
-    if (hoursLimit === 360) return '15 ngày qua';
     return `${hoursLimit} giờ qua`;
   };
 
@@ -136,10 +204,7 @@ const Charts = () => {
     backgroundGradientTo: colors.surface,
     decimalPlaces: 1,
     color: (opacity = 1) => `rgba(47, 125, 78, ${opacity})`,
-    labelColor: (opacity = 1) => {
-      // Darker label in light mode
-      return `rgba(85, 107, 94, ${opacity})`;
-    },
+    labelColor: (opacity = 1) => `rgba(85, 107, 94, ${opacity})`,
     style: { borderRadius: radii.lg },
     propsForDots: {
       r: '5',
@@ -177,6 +242,7 @@ const Charts = () => {
           <Text style={styles.heroTitle}>Biểu đồ</Text>
         </View>
       </View>
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -184,9 +250,14 @@ const Charts = () => {
       >
         {/* Header chọn thời gian */}
         <View style={styles.timeHeader}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.timeHeaderTitle}>Thời gian hiển thị</Text>
-            <Text style={styles.timeHeaderSub}>{getTimeLabel()}</Text>
+            <View style={styles.timeLabelRow}>
+              {viewMode === 'date' && (
+                <MaterialCommunityIcons name="calendar-check" size={14} color={colors.primary} style={{ marginRight: 4 }} />
+              )}
+              <Text style={styles.timeHeaderSub}>{getTimeLabel()}</Text>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.moreButton}
@@ -272,70 +343,117 @@ const Charts = () => {
 
       {/* Modal tùy chọn thời gian */}
       <Modal
-        animationType="fade"
+        animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => { setModalVisible(false); setShowDatePicker(false); }}
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => { setModalVisible(false); setShowDatePicker(false); }}
+          />
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Tùy chọn thời gian</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity onPress={() => { setModalVisible(false); setShowDatePicker(false); }}>
                 <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(1)}>
-              <MaterialCommunityIcons name="clock-fast" size={20} color={hoursLimit === 1 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, hoursLimit === 1 && styles.modalOptionActive]}>
-                1 giờ qua
-              </Text>
-              {hoursLimit === 1 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+            {/* --- Khoảng gần đây --- */}
+            <Text style={styles.modalSectionLabel}>Khoảng gần đây</Text>
+
+            {[
+              { hours: 1, label: '1 giờ qua', icon: 'clock-fast' },
+              { hours: 6, label: '6 giờ qua', icon: 'clock-outline' },
+              { hours: 12, label: '12 giờ qua', icon: 'clock-time-four-outline' },
+            ].map(({ hours, label, icon }) => {
+              const isActive = viewMode === 'recent' && hoursLimit === hours;
+              return (
+                <TouchableOpacity
+                  key={hours}
+                  style={styles.modalOption}
+                  onPress={() => handleSelectHours(hours)}
+                >
+                  <MaterialCommunityIcons
+                    name={icon}
+                    size={20}
+                    color={isActive ? colors.primary : colors.textSecondary}
+                  />
+                  <Text style={[styles.modalOptionText, isActive && styles.modalOptionActive]}>
+                    {label}
+                  </Text>
+                  {isActive && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* --- Chọn ngày cụ thể --- */}
+            <Text style={[styles.modalSectionLabel, { marginTop: spacing.md }]}>Chọn ngày cụ thể</Text>
+
+            <TouchableOpacity
+              style={[
+                styles.datePickerButton,
+                viewMode === 'date' && { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+              ]}
+              onPress={handleOpenDatePicker}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name="calendar-search"
+                size={22}
+                color={viewMode === 'date' ? colors.primary : colors.textSecondary}
+              />
+              <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                <Text style={[
+                  styles.datePickerButtonLabel,
+                  viewMode === 'date' && { color: colors.primary },
+                ]}>
+                  {viewMode === 'date' ? formatDateVN(selectedDate) : 'Chọn ngày...'}
+                </Text>
+                <Text style={styles.datePickerButtonSub}>
+                  Xem dữ liệu trong một ngày bất kỳ
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color={viewMode === 'date' ? colors.primary : colors.textMuted}
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(6)}>
-              <MaterialCommunityIcons name="clock-outline" size={20} color={hoursLimit === 6 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, hoursLimit === 6 && styles.modalOptionActive]}>
-                6 giờ qua
-              </Text>
-              {hoursLimit === 6 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(12)}>
-              <MaterialCommunityIcons name="clock-time-four-outline" size={20} color={hoursLimit === 12 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, hoursLimit === 12 && styles.modalOptionActive]}>
-                12 giờ qua
-              </Text>
-              {hoursLimit === 12 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(24)}>
-              <MaterialCommunityIcons name="update" size={20} color={hoursLimit === 24 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, hoursLimit === 24 && styles.modalOptionActive]}>
-                24 giờ qua
-              </Text>
-              {hoursLimit === 24 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(168, true)}>
-              <MaterialCommunityIcons name="calendar-week" size={20} color={hoursLimit === 168 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, hoursLimit === 168 && styles.modalOptionActive]}>
-                7 ngày qua
-              </Text>
-              {hoursLimit === 168 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectHours(360, true)}>
-              <MaterialCommunityIcons name="calendar-month" size={20} color={hoursLimit === 360 ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.modalOptionText, hoursLimit === 360 && styles.modalOptionActive]}>
-                15 ngày qua
-              </Text>
-              {hoursLimit === 360 && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
-            </TouchableOpacity>
+            {/* DateTimePicker (inline cho iOS, native dialog cho Android) */}
+            {showDatePicker && (
+              <View style={styles.datePickerWrapper}>
+                <DateTimePicker
+                  value={pendingDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  maximumDate={new Date()}
+                  onChange={handleDateChange}
+                  locale="vi-VN"
+                  accentColor={colors.primary}
+                  themeVariant="light"
+                  style={{ alignSelf: 'center' }}
+                />
+                {Platform.OS === 'ios' && (
+                  <View style={styles.datePickerActions}>
+                    <TouchableOpacity style={styles.dateActionCancel} onPress={handleCancelDate}>
+                      <Text style={styles.dateActionCancelText}>Huỷ</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.dateActionConfirm, { backgroundColor: colors.primary }]} onPress={handleConfirmDate}>
+                      <Text style={styles.dateActionConfirmText}>Xác nhận</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -414,6 +532,11 @@ const createStyles = (colors) => StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadows.lift,
   },
+  timeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   timeHeaderTitle: {
     fontSize: 14,
     fontFamily: fonts.bold,
@@ -423,7 +546,6 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.medium,
     color: colors.primary,
-    marginTop: 2,
   },
   moreButton: {
     padding: spacing.xs,
@@ -540,18 +662,27 @@ const createStyles = (colors) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+  },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radii.xl,
     borderTopRightRadius: radii.xl,
     padding: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingBottom: spacing.sm,
@@ -561,10 +692,18 @@ const createStyles = (colors) => StyleSheet.create({
     fontFamily: fonts.bold,
     color: colors.textPrimary,
   },
+  modalSectionLabel: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.xs,
+  },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceMuted,
   },
@@ -578,6 +717,71 @@ const createStyles = (colors) => StyleSheet.create({
   modalOptionActive: {
     color: colors.primary,
     fontFamily: fonts.bold,
+  },
+
+  // Date Picker Button
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceMuted,
+    marginBottom: spacing.sm,
+  },
+  datePickerButtonLabel: {
+    fontSize: 15,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+  },
+  datePickerButtonSub: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+
+  // Date Picker Wrapper
+  datePickerWrapper: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.sm,
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  dateActionCancel: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dateActionCancelText: {
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+  },
+  dateActionConfirm: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.pill,
+  },
+  dateActionConfirmText: {
+    fontSize: 14,
+    fontFamily: fonts.bold,
+    color: '#fff',
   },
 });
 

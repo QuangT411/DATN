@@ -4,7 +4,6 @@ export const darkColors = {
   background:    '#0D1410',
   surface:       '#161E19',
   surfaceMuted:  '#1C2820',
-  surfaceCard:   '#1A2420',
 
   // Brand xanh lá
   primary:       '#3DBE6E',
@@ -18,7 +17,6 @@ export const darkColors = {
   accentBlue:    '#4BA6D8',
   accentBlueSoft:'#0E2233',
   accentTeal:    '#2DC4AE',
-  accentTealSoft:'#0C2722',
 
   // Text
   textPrimary:   '#E8F0EA',
@@ -27,14 +25,11 @@ export const darkColors = {
 
   // Border
   border:        '#243029',
-  borderStrong:  '#2E3D34',
 
   // Tiện ích
   white:         '#FFFFFF',
   danger:        '#E05C52',
-  dangerSoft:    '#2D1412',
   overlay:       'rgba(0, 0, 0, 0.72)',
-  overlayLight:  'rgba(0, 0, 0, 0.40)',
   glowPrimary:   '#1A3D26',
   glowAccent:    '#1A2A3D',
 };
@@ -45,7 +40,6 @@ export const lightColors = {
   background:    '#F2F7F4',
   surface:       '#FFFFFF',
   surfaceMuted:  '#EBF2EE',
-  surfaceCard:   '#F8FBF9',
 
   // Brand xanh lá (giữ nguyên)
   primary:       '#2EA85A',
@@ -59,7 +53,6 @@ export const lightColors = {
   accentBlue:    '#2E86BE',
   accentBlueSoft:'#DBF0FF',
   accentTeal:    '#1FA893',
-  accentTealSoft:'#D4F5F0',
 
   // Text
   textPrimary:   '#1A2E22',
@@ -68,19 +61,16 @@ export const lightColors = {
 
   // Border
   border:        '#D0E5D8',
-  borderStrong:  '#B8D4C4',
 
   // Tiện ích
   white:         '#FFFFFF',
   danger:        '#D63B31',
-  dangerSoft:    '#FDECEA',
   overlay:       'rgba(0, 0, 0, 0.50)',
-  overlayLight:  'rgba(0, 0, 0, 0.25)',
   glowPrimary:   '#C8EDD8',
   glowAccent:    '#C8D8ED',
 };
 
-// Backward compat — giữ export `colors` = dark (cho Login/Register không dùng theme)
+// Backward compat — giữ export `colors` = dark (cho TabNavigator dùng static)
 export const colors = darkColors;
 
 // ─── Hàm lấy màu theo theme ─────────────────────────────────────

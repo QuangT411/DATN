@@ -19,11 +19,10 @@ import { fonts, radii, spacing, shadows } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useMqtt } from '../context/MqttContext';
 import { useAuth } from '../context/AuthContext';
-import { TOPICS } from '../mqtt/mqttConfig';
 
 const WaterPump = () => {
   const { colors } = useTheme();
-  const { publish, controlPump, mode, setMode, connected, pumpStatus } = useMqtt();
+  const { controlPump, mode, setMode, connected, pumpStatus } = useMqtt();
   const { userData } = useAuth();
 
   const [data, setData] = useState({

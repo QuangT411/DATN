@@ -271,11 +271,6 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: spacing.sm,
     textAlign: 'center',
   },
-  bannerSub: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    color: 'rgba(255,255,255,0.78)',
-  },
 
   // Form
   form: {
@@ -296,13 +291,6 @@ const makeStyles = (colors) => StyleSheet.create({
     letterSpacing: -0.2,
     textAlign: 'center',
     alignSelf: 'stretch',
-  },
-  formSub: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
-    lineHeight: 20,
   },
 
   // Input

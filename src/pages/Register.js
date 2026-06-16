@@ -230,11 +230,6 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: spacing.sm,
     textAlign: 'center',
   },
-  bannerSub: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    color: 'rgba(255,255,255,0.78)',
-  },
 
   // Form
   form: {
@@ -255,13 +250,6 @@ const makeStyles = (colors) => StyleSheet.create({
     letterSpacing: -0.2,
     textAlign: 'center',
     alignSelf: 'stretch',
-  },
-  formSub: {
-    fontSize: 13,
-    fontFamily: fonts.regular,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    lineHeight: 18,
   },
 
   // Field
