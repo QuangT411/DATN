@@ -7,12 +7,14 @@ import WaterPump from '../pages/WaterPump';
 import Charts from '../pages/Charts';
 import Settings from '../pages/Settings';
 import { useAuth } from '../context/AuthContext';
-import { colors, fonts, radii } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, radii } from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
   const { userData } = useAuth();
+  const { colors } = useTheme();
   const isAdmin = userData?.role === 'admin';
 
   return (

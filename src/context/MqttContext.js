@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as mqttService from '../mqtt/mqttService';
-import { TOPICS } from '../mqtt/mqttConfig';
+import * as mqttService from '../services/mqttService';
+import { TOPICS } from '../services/mqttService';
 
 const MqttContext = createContext(null);
 
