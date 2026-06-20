@@ -5,11 +5,13 @@ import {
   signOut,
   onAuthStateChanged,
   sendEmailVerification,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -22,27 +24,34 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (email, password, username, phone) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
-      uid: userCredential.user.uid,
+    const uid = userCredential.user.uid;
+
+    await sendEmailVerification(userCredential.user);
+
+    // Lưu vào Firestore ngay lập tức khi đăng ký
+    await setDoc(doc(db, 'users', uid), {
+      uid,
       username,
       email,
       phone,
-      password,
       role: 'user',
       nameDevice: null,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
     });
-    await sendEmailVerification(userCredential.user);
+
     await signOut(auth);
     return userCredential.user;
   };
 
   const login = async (email, password) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+    // Kiểm tra email đã được xác minh chưa
     if (!userCredential.user.emailVerified) {
       await signOut(auth);
       throw new Error('Chưa xác minh email. Vui lòng kiểm tra hộp thư của bạn.');
     }
+
     return userCredential.user;
   };
 
@@ -77,19 +86,19 @@ export const AuthProvider = ({ children }) => {
    * - Tạo/cập nhật document trong devices/{nameDevice}
    * - Ghi nameDevice vào users/{uid}
    * @param {string} nameDevice  - vd: "device1"
-   * @param {string} macAddress  - MAC address ESP32
+   * @param {string} deviceID  - Device ID của ESP32
    * @param {string} location    - vd: "Vườn sau"
    */
-  const saveDevice = async (nameDevice, macAddress, location) => {
+  const saveDevice = async (nameDevice, deviceID, location) => {
     if (!user) throw new Error('Chưa đăng nhập');
     const nd = nameDevice.trim();
-    const mac = macAddress.trim().toUpperCase();
+    const dId = deviceID.trim().toUpperCase();
     const loc = location.trim();
 
     // Tạo/cập nhật document trong collection devices/
     await setDoc(doc(db, 'devices', nd), {
       nameDevice: nd,
-      macAddress: mac,
+      deviceID: dId,
       location: loc,
     });
 
@@ -104,10 +113,17 @@ export const AuthProvider = ({ children }) => {
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
     await reauthenticateWithCredential(user, credential);
     await updatePassword(user, newPassword);
+  };
 
-    // Cập nhật mật khẩu mới lên Firestore để đồng bộ với Web quản trị
-    await updateDoc(doc(db, 'users', user.uid), { password: newPassword });
-    setUserData((prev) => ({ ...prev, password: newPassword }));
+  /** Gửi lại email xác minh (dùng khi user chưa nhận được email) */
+  const resendVerificationEmail = async (email, password) => {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    if (userCredential.user.emailVerified) {
+      await signOut(auth);
+      throw new Error('Đã xác minh. Vui lòng đăng nhập bình thường.');
+    }
+    await sendEmailVerification(userCredential.user);
+    await signOut(auth);
   };
 
   useEffect(() => {
@@ -123,7 +139,7 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const value = { user, userData, loading, register, login, logout, resetPassword, updateUserProfile, saveDevice, changePassword };
+  const value = { user, userData, loading, register, login, logout, resetPassword, resendVerificationEmail, updateUserProfile, saveDevice, changePassword };
 
   return (
     <AuthContext.Provider value={value}>

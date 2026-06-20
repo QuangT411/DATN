@@ -192,7 +192,7 @@ const Settings = () => {
   const [showPwModal, setShowPwModal] = useState(false);
   const [showMoreModal, setShowMoreModal] = useState(false);
   const [nameDeviceInput, setNameDeviceInput] = useState('');
-  const [macInput, setMacInput] = useState('');
+  const [deviceIdInput, setDeviceIdInput] = useState('');
   const [locationInput, setLocationInput] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
   const [isEditingDevice, setIsEditingDevice] = useState(false);
@@ -210,7 +210,7 @@ const Settings = () => {
           const deviceDoc = await getDoc(doc(db, 'devices', userData.nameDevice));
           if (deviceDoc.exists()) {
             const devData = deviceDoc.data();
-            setMacInput(devData.macAddress || '');
+            setDeviceIdInput(devData.deviceID || '');
             setLocationInput(devData.location || '');
             setNameDeviceInput(devData.nameDevice || '');
           }
@@ -219,7 +219,7 @@ const Settings = () => {
         }
       } else {
         setNameDeviceInput('');
-        setMacInput('');
+        setDeviceIdInput('');
         setLocationInput('');
       }
     };
@@ -227,13 +227,13 @@ const Settings = () => {
   }, [userData?.nameDevice]);
 
   const handleSaveDevice = async () => {
-    if (!nameDeviceInput.trim() || !macInput.trim() || !locationInput.trim()) {
+    if (!nameDeviceInput.trim() || !deviceIdInput.trim() || !locationInput.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ tất cả các trường');
       return;
     }
     setSavingDevice(true);
     try {
-      await saveDevice(nameDeviceInput.trim(), macInput.trim(), locationInput.trim());
+      await saveDevice(nameDeviceInput.trim(), deviceIdInput.trim(), locationInput.trim());
       setIsEditingDevice(false);
       Alert.alert('✅ Thành công', 'Đã lưu thiết bị');
     } catch (e) {
@@ -399,9 +399,9 @@ const Settings = () => {
               <MaterialCommunityIcons name="bluetooth-connect" size={18} color={colors.textMuted} />
               <TextInput
                 style={styles.input}
-                value={macInput}
-                onChangeText={setMacInput}
-                placeholder="MAC address (vd: A4CF12ABCDEF)"
+                value={deviceIdInput}
+                onChangeText={setDeviceIdInput}
+                placeholder="Device ID (vd:A4CF12ABCDEF)"
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="characters"
               />

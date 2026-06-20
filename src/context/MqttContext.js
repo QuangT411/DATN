@@ -62,11 +62,6 @@ export const MqttProvider = ({ children }) => {
     };
   }, [connected, deviceId]);
 
-  /** Gửi lệnh MQTT thông thường */
-  const publish = useCallback((topic, payload) => {
-    return mqttService.publish(topic, payload);
-  }, []);
-
   /**
    * Điều khiển bơm — gửi lệnh tới đúng deviceId đang chọn
    * @param {boolean} isOn    - true = bật, false = tắt
@@ -111,7 +106,7 @@ export const MqttProvider = ({ children }) => {
   }, [deviceId]);
 
   return (
-    <MqttContext.Provider value={{ connected, publish, controlPump, mode, setMode, pumpStatus, deviceId }}>
+    <MqttContext.Provider value={{ connected, controlPump, mode, setMode, pumpStatus, deviceId }}>
       {children}
     </MqttContext.Provider>
   );

@@ -25,7 +25,8 @@ const Login = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
-  const { login, resetPassword } = useAuth();
+  const [lastResendTime, setLastResendTime] = useState(null);
+  const { login, resetPassword, resendVerificationEmail } = useAuth();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -39,9 +40,39 @@ const Login = ({ navigation }) => {
     try {
       await login(email.trim(), password);
     } catch (error) {
-      Alert.alert('Đăng nhập thất bại', 'Thông tin tài khoản hoặc mật khẩu không chính xác');
+      if (error.message.includes('xác minh')) {
+        Alert.alert(
+          '⚠️ Email chưa được xác minh',
+          'Tài khoản chưa được xác minh. Kiểm tra hộp thư hoặc yêu cầu gửi lại email.',
+          [
+            { text: 'Đóng', style: 'cancel' },
+            { text: 'Gửi lại email', onPress: handleResendVerification },
+          ]
+        );
+      } else {
+        Alert.alert('Đăng nhập thất bại', 'Sai email hoặc mật khẩu. Vui lòng thử lại.');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    // Kiểm tra cooldown 60s
+    if (lastResendTime) {
+      const elapsed = Math.floor((Date.now() - lastResendTime) / 1000);
+      if (elapsed < 60) {
+        const remaining = 60 - elapsed;
+        Alert.alert('Vui lòng chờ', `Bạn có thể gửi lại sau ${remaining} giây.`);
+        return;
+      }
+    }
+    try {
+      await resendVerificationEmail(email.trim(), password);
+      setLastResendTime(Date.now());
+      Alert.alert('✓ Đã gửi lại', 'Email xác minh đã được gửi. Vui lòng kiểm tra hộp thư (kể cả Spam).');
+    } catch (error) {
+      Alert.alert('Lỗi', error.message);
     }
   };
 

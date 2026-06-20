@@ -36,7 +36,10 @@ const Register = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const [registered, setRegistered] = useState(false);
+  const [lastResendTime, setLastResendTime] = useState(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const { register, resendVerificationEmail } = useAuth();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -62,15 +65,33 @@ const Register = ({ navigation }) => {
     setLoading(true);
     try {
       await register(email.trim(), password, username.trim(), phone.trim());
-      Alert.alert(
-        '✓ Đăng ký thành công',
-        'Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.',
-        [{ text: 'Về đăng nhập', onPress: () => navigation.goBack() }]
-      );
+      setRegistered(true);
+      setLastResendTime(Date.now());
     } catch (error) {
       Alert.alert('Đăng ký thất bại', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (lastResendTime) {
+      const elapsed = Math.floor((Date.now() - lastResendTime) / 1000);
+      if (elapsed < 60) {
+        const remaining = 60 - elapsed;
+        Alert.alert('Vui lòng chờ', `Bạn có thể gửi lại sau ${remaining} giây.`);
+        return;
+      }
+    }
+    setResendLoading(true);
+    try {
+      await resendVerificationEmail(form.email.trim(), form.password);
+      setLastResendTime(Date.now());
+      Alert.alert('✓ Đã gửi lại', 'Kiểm tra hộp thư của bạn (kể cả Spam).');
+    } catch (error) {
+      Alert.alert('Lỗi', error.message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -82,11 +103,52 @@ const Register = ({ navigation }) => {
       <View pointerEvents="none" style={styles.glow1} />
       <View pointerEvents="none" style={styles.glow2} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      {registered ? (
+        // ---- VIEW CHờ XÁC MINH EMAIL ----
+        <View style={styles.verifyContainer}>
+          <View style={styles.verifyIconWrap}>
+            <MaterialCommunityIcons name="email-check-outline" size={64} color={colors.primary} />
+          </View>
+          <Text style={styles.verifyTitle}>Kiểm tra hộp thư!</Text>
+          <Text style={styles.verifyDesc}>
+            Chúng tôi đã gửi email xác minh tới
+          </Text>
+          <Text style={styles.verifyEmail}>{form.email.trim()}</Text>
+          <Text style={styles.verifyDesc}>
+            Vui lòng mở email và nhấn vào đường liên kết xác minh trước khi đăng nhập.
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.resendBtn, resendLoading && styles.resendBtnDisabled]}
+            onPress={handleResend}
+            disabled={resendLoading}
+            activeOpacity={0.85}
+          >
+            {resendLoading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="email-sync-outline" size={18} color={colors.primary} />
+                <Text style={styles.resendBtnText}>Gửi lại email xác minh</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={18} color="#fff" />
+            <Text style={styles.backBtnText}>Về đăng nhập</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Banner */}
         <View style={styles.banner}>
           <Image
@@ -175,6 +237,7 @@ const Register = ({ navigation }) => {
           </View>
         </View>
       </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -325,6 +388,78 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.bold,
     color: colors.primary,
+  },
+  // Verification Pending
+  verifyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
+  },
+  verifyIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  verifyTitle: {
+    fontSize: 24,
+    fontFamily: fonts.bold,
+    color: colors.textPrimary,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  verifyDesc: {
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  verifyEmail: {
+    fontSize: 15,
+    fontFamily: fonts.bold,
+    color: colors.primary,
+    textAlign: 'center',
+  },
+  resendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radii.md,
+    height: 50,
+    width: '100%',
+    marginTop: spacing.md,
+  },
+  resendBtnDisabled: { opacity: 0.5 },
+  resendBtnText: {
+    fontSize: 15,
+    fontFamily: fonts.semibold,
+    color: colors.primary,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    height: 50,
+    width: '100%',
+    marginTop: spacing.xs,
+    ...shadows.soft,
+  },
+  backBtnText: {
+    fontSize: 15,
+    fontFamily: fonts.semibold,
+    color: '#fff',
   },
 });
 
