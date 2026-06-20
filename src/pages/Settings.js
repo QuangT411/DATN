@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts, radii, spacing, shadows } from '../styles/theme';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/firebaseConfig';
 
 // ─── Modal sửa thông tin ───────────────────────────────────────
 const EditProfileModal = ({ visible, onClose, userData, onSave, colors }) => {
@@ -184,16 +186,62 @@ const ChangePasswordModal = ({ visible, onClose, onSave, colors }) => {
 
 // ─── Màn hình Cài đặt chính ────────────────────────────────────
 const Settings = () => {
-  const { user, userData, logout, updateUserProfile, changePassword } = useAuth();
+  const { user, userData, logout, updateUserProfile, saveDevice, changePassword } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPwModal, setShowPwModal] = useState(false);
+  const [showMoreModal, setShowMoreModal] = useState(false);
+  const [nameDeviceInput, setNameDeviceInput] = useState('');
+  const [macInput, setMacInput] = useState('');
+  const [locationInput, setLocationInput] = useState('');
+  const [savingDevice, setSavingDevice] = useState(false);
+  const [isEditingDevice, setIsEditingDevice] = useState(false);
 
   const INFO_ROWS = useMemo(() => [
     { icon: 'shield-check', color: colors.primary, label: 'Trạng thái tài khoản', value: 'Đã xác thực email' },
-    { icon: 'cellphone-check', color: colors.accentBlue, label: 'Nền tảng', value: 'Android · iOS · Web' },
+    { icon: 'cellphone-check', color: colors.accentBlue, label: 'Nền tảng', value: 'Android - iOS ' },
     { icon: 'database-check', color: colors.accentSun, label: 'Firebase', value: 'Đã kết nối' },
   ], [colors]);
+
+  useEffect(() => {
+    const fetchDeviceDetails = async () => {
+      if (userData?.nameDevice) {
+        try {
+          const deviceDoc = await getDoc(doc(db, 'devices', userData.nameDevice));
+          if (deviceDoc.exists()) {
+            const devData = deviceDoc.data();
+            setMacInput(devData.macAddress || '');
+            setLocationInput(devData.location || '');
+            setNameDeviceInput(devData.nameDevice || '');
+          }
+        } catch (error) {
+          console.log('Error fetching device details:', error);
+        }
+      } else {
+        setNameDeviceInput('');
+        setMacInput('');
+        setLocationInput('');
+      }
+    };
+    fetchDeviceDetails();
+  }, [userData?.nameDevice]);
+
+  const handleSaveDevice = async () => {
+    if (!nameDeviceInput.trim() || !macInput.trim() || !locationInput.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ tất cả các trường');
+      return;
+    }
+    setSavingDevice(true);
+    try {
+      await saveDevice(nameDeviceInput.trim(), macInput.trim(), locationInput.trim());
+      setIsEditingDevice(false);
+      Alert.alert('✅ Thành công', 'Đã lưu thiết bị');
+    } catch (e) {
+      Alert.alert('Lỗi', e.message);
+    } finally {
+      setSavingDevice(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất không?', [
@@ -223,6 +271,13 @@ const Settings = () => {
           <MaterialCommunityIcons name="cog" size={32} color="rgba(255,255,255,0.9)" />
           <Text style={styles.heroTitle}>Cài đặt</Text>
         </View>
+        <TouchableOpacity
+          style={styles.moreBtn}
+          onPress={() => setShowMoreModal(true)}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.white} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -296,29 +351,90 @@ const Settings = () => {
           ))}
         </View>
 
-        {/* Giao diện */}
-        <Text style={styles.sectionLabel}>Giao diện</Text>
-        <View style={styles.themeCard}>
-          <View style={styles.themeRow}>
-            <View style={[styles.themeIconWrap, { backgroundColor: isDark ? '#1A2A3D' : '#FEF3DC' }]}>
-              <MaterialCommunityIcons
-                name={isDark ? 'weather-night' : 'white-balance-sunny'}
-                size={22}
-                color={isDark ? colors.accentBlue : colors.accentSun}
-              />
+
+
+        {/* Device Section */}
+        <Text style={styles.sectionLabel}>Thiết bị</Text>
+        <View style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <View style={[styles.infoIconWrap, { backgroundColor: colors.primary + '18' }]}>
+              <MaterialCommunityIcons name="chip" size={20} color={colors.primary} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.themeTitle}>{isDark ? 'Chế độ tối' : 'Chế độ sáng'}</Text>
-              <Text style={styles.themeSub}>{isDark ? 'Nền đen, giảm mỏi mắt' : 'Nền sáng, dễ đọc ban ngày'}</Text>
+            <View style={styles.infoText}>
+              <Text style={styles.infoLabel}>Thiết bị hiện tại</Text>
+              <Text style={styles.infoValue}>
+                {userData?.nameDevice ?? 'Chưa kết nối thiết bị'}
+              </Text>
             </View>
-            <Switch
-              value={isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ false: '#D4E5DA', true: colors.primarySoft }}
-              thumbColor={isDark ? colors.primary : '#7A9A88'}
-            />
+            {!!userData?.nameDevice && (
+              <TouchableOpacity
+                style={styles.editDeviceBtn}
+                onPress={() => setIsEditingDevice(!isEditingDevice)}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name={isEditingDevice ? 'close-circle' : 'pencil-circle'}
+                  size={24}
+                  color={isEditingDevice ? colors.danger : colors.primary}
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
+
+        {(!userData?.nameDevice || isEditingDevice) && (
+          <View style={styles.deviceForm}>
+            <View style={styles.inputWrap}>
+              <MaterialCommunityIcons name="identifier" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.input}
+                value={nameDeviceInput}
+                onChangeText={setNameDeviceInput}
+                placeholder="Tên thiết bị (vd: device1)"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.inputWrap}>
+              <MaterialCommunityIcons name="bluetooth-connect" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.input}
+                value={macInput}
+                onChangeText={setMacInput}
+                placeholder="MAC address (vd: A4CF12ABCDEF)"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="characters"
+              />
+            </View>
+            <View style={styles.inputWrap}>
+              <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.input}
+                value={locationInput}
+                onChangeText={setLocationInput}
+                placeholder="Vị trí (vd: Vườn sau)"
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.saveBtn, savingDevice && { opacity: 0.6 }]}
+              onPress={handleSaveDevice}
+              disabled={savingDevice}
+              activeOpacity={0.85}
+            >
+              {savingDevice ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="content-save-outline" size={18} color="#fff" />
+                  <Text style={styles.saveBtnText}>Lưu thiết bị</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
@@ -344,6 +460,50 @@ const Settings = () => {
         onSave={changePassword}
         colors={colors}
       />
+
+      {/* Modal Tùy chọn */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showMoreModal}
+        onRequestClose={() => setShowMoreModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowMoreModal(false)}
+          />
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Tùy chọn giao diện</Text>
+              <TouchableOpacity onPress={() => setShowMoreModal(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.themeRow}>
+              <View style={[styles.themeIconWrap, { backgroundColor: isDark ? '#1A2A3D' : '#FEF3DC' }]}>
+                <MaterialCommunityIcons
+                  name={isDark ? 'weather-night' : 'white-balance-sunny'}
+                  size={22}
+                  color={isDark ? colors.accentBlue : colors.accentSun}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.themeTitle}>{isDark ? 'Chế độ tối' : 'Chế độ sáng'}</Text>
+                <Text style={styles.themeSub}>{isDark ? 'Nền đen, giảm mỏi mắt' : 'Nền sáng, dễ đọc ban ngày'}</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: '#D4E5DA', true: colors.primarySoft }}
+                thumbColor={isDark ? colors.primary : '#7A9A88'}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -358,6 +518,7 @@ const createStyles = (colors) => StyleSheet.create({
   heroImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: spacing.lg, gap: spacing.xxs },
   heroTitle: { fontSize: 26, fontFamily: fonts.bold, color: colors.white, letterSpacing: -0.3, marginTop: spacing.xs, textAlign: 'center' },
+  moreBtn: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 35, right: spacing.md, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
@@ -396,9 +557,25 @@ const createStyles = (colors) => StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg },
 
   // Logout
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: radii.md, height: 52, gap: spacing.xs, marginBottom: spacing.md, ...shadows.lift },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: radii.md, height: 50, gap: spacing.xs, marginBottom: spacing.md, ...shadows.lift },
   logoutText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.1 },
   versionText: { textAlign: 'center', fontSize: 12, color: colors.textMuted, fontFamily: fonts.medium, marginBottom: spacing.sm },
+
+  // Device Form
+  deviceForm: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    ...shadows.lift
+  },
+  editDeviceBtn: {
+    padding: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
@@ -412,7 +589,6 @@ const createStyles = (colors) => StyleSheet.create({
   saveBtnText: { color: '#fff', fontSize: 15, fontFamily: fonts.bold },
 
   // Theme toggle
-  themeCard: { backgroundColor: colors.surface, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg, overflow: 'hidden', ...shadows.lift },
   themeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.sm },
   themeIconWrap: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   themeTitle: { fontSize: 15, fontFamily: fonts.semibold, color: colors.textPrimary },

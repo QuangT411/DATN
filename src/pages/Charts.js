@@ -19,6 +19,7 @@ import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts, radii, spacing, shadows } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 const downsampleData = (data, maxPoints = 15) => {
   if (data.length <= maxPoints) return data;
@@ -35,6 +36,8 @@ const downsampleData = (data, maxPoints = 15) => {
 
 const Charts = () => {
   const { colors } = useTheme();
+  const { userData } = useAuth();
+  const deviceId = userData?.nameDevice ?? null;
   const { width: windowWidth } = useWindowDimensions();
   const [sensorHistory, setSensorHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,11 +61,11 @@ const Charts = () => {
   ], [colors]);
 
   useEffect(() => {
+    if (!deviceId) return;
     setLoading(true);
     let sensorQuery;
 
     if (viewMode === 'date') {
-      // Lấy dữ liệu cho ngày đã chọn (00:00:00 → 23:59:59)
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
@@ -72,17 +75,16 @@ const Charts = () => {
       const endSec = Math.floor(endOfDay.getTime() / 1000);
 
       sensorQuery = query(
-        ref(database, 'He_thong_tuoi/sensors/data'),
+        ref(database, `sensors/${deviceId}/data`),
         orderByKey(),
         startAt(startSec.toString()),
         endAt(endSec.toString())
       );
     } else {
-      // Chế độ xem gần đây
       const currentSeconds = Math.floor(Date.now() / 1000);
       const startSeconds = currentSeconds - hoursLimit * 60 * 60;
       sensorQuery = query(
-        ref(database, 'He_thong_tuoi/sensors/data'),
+        ref(database, `sensors/${deviceId}/data`),
         orderByKey(),
         startAt(startSeconds.toString())
       );
@@ -118,7 +120,7 @@ const Charts = () => {
     });
 
     return () => unsubSensor();
-  }, [hoursLimit, viewMode, selectedDate]);
+  }, [hoursLimit, viewMode, selectedDate, deviceId]);
 
   const getChartData = () => {
     if (sensorHistory.length === 0) {

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Image,
   RefreshControl,
 } from 'react-native';
@@ -13,11 +12,14 @@ import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts, radii, spacing, shadows } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useMqtt } from '../context/MqttContext';
 
 const Home = () => {
   const { colors } = useTheme();
   const { pumpStatus, mode } = useMqtt();
+  const { userData } = useAuth();
+  const deviceId = userData?.nameDevice ?? null;
   const isAiMode = mode === 'ai';
   const [data, setData] = useState({
     temperature: 0,
@@ -26,7 +28,6 @@ const Home = () => {
     humidity_air: 0,
     water_liters: 0,
   });
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const SENSOR_CARDS = useMemo(() => [
@@ -65,7 +66,8 @@ const Home = () => {
   ], [colors]);
 
   useEffect(() => {
-    const sensorRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
+    if (!deviceId) return;
+    const sensorRef = query(ref(database, `sensors/${deviceId}/data`), limitToLast(1));
     const unsubSensor = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         let latest = {};
@@ -81,11 +83,10 @@ const Home = () => {
           water_liters: latest.total_volume_L ?? 0,
         }));
       }
-      setLoading(false);
       setRefreshing(false);
     });
     return () => { unsubSensor(); };
-  }, []);
+  }, [deviceId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -93,15 +94,6 @@ const Home = () => {
   };
 
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -241,18 +233,6 @@ const createStyles = (colors) => StyleSheet.create({
     borderRadius: 140,
     backgroundColor: colors.glowAccent,
     opacity: 0.6,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    gap: spacing.sm,
-  },
-  loadingText: {
-    fontSize: 15,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
   },
 
   // Hero

@@ -1,8 +1,5 @@
 import mqtt from 'mqtt';
-import { MQTT_CONFIG, TOPICS } from '../mqtt/mqttConfig';
-
-// Re-export TOPICS để các layer trên không cần import thẳng từ mqttConfig
-export { TOPICS };
+import { MQTT_CONFIG } from '../mqtt/mqttConfig';
 
 // MQTT Service — quản lý kết nối và giao tiếp
 let client = null;

@@ -24,16 +24,17 @@ const WaterPump = () => {
   const { colors } = useTheme();
   const { controlPump, mode, setMode, connected, pumpStatus } = useMqtt();
   const { userData } = useAuth();
+  const deviceId = userData?.nameDevice ?? null;
 
   const [data, setData] = useState({
     water_liters: 0,
   });
-  const [loading, setLoading] = useState(true);
   const [manualTime, setManualTime] = useState('10');
   const [controlLoading, setControlLoading] = useState(false);
 
   useEffect(() => {
-    const sensorRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
+    if (!deviceId) return;
+    const sensorRef = query(ref(database, `sensors/${deviceId}/data`), limitToLast(1));
     const unsubSensor = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         let latest = {};
@@ -43,11 +44,10 @@ const WaterPump = () => {
           water_liters: latest.total_volume_L ?? 0,
         }));
       }
-      setLoading(false);
     });
 
     return () => { unsubSensor(); };
-  }, []);
+  }, [deviceId]);
 
   const handleSetMode = (newMode) => {
     if (!connected) {
@@ -70,6 +70,10 @@ const WaterPump = () => {
       Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
       return;
     }
+    if (pumpStatus === null) {
+      Alert.alert('Đang chờ phản hồi', 'Máy bơm đang trong trạng thái chờ, không thể gửi lệnh bật lúc này.');
+      return;
+    }
     setControlLoading(true);
     try {
       const time = parseInt(manualTime) || 10;
@@ -87,6 +91,10 @@ const WaterPump = () => {
       Alert.alert('Mất kết nối', 'Không thể gửi lệnh, vui lòng kiểm tra kết nối MQTT');
       return;
     }
+    if (pumpStatus === null) {
+      Alert.alert('Đang chờ phản hồi', 'Máy bơm đang trong trạng thái chờ, không thể gửi lệnh tắt lúc này.');
+      return;
+    }
     setControlLoading(true);
     try {
       const ok = controlPump(false);
@@ -99,38 +107,6 @@ const WaterPump = () => {
   };
 
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  if (!userData?.role) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accentBlue} />
-        <Text style={styles.loadingText}>Đang kiểm tra quyền...</Text>
-      </View>
-    );
-  }
-
-  if (userData.role !== 'admin') {
-    return (
-      <View style={styles.restrictedContainer}>
-        <View style={styles.restrictedCard}>
-          <MaterialCommunityIcons name="shield-lock" size={42} color={colors.danger} />
-          <Text style={styles.restrictedTitle}>Không có quyền truy cập</Text>
-          <Text style={styles.restrictedText}>
-            Tài khoản của bạn không được phép điều khiển máy bơm.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accentBlue} />
-        <Text style={styles.loadingText}>Đang tải...</Text>
-      </View>
-    );
-  }
 
   const isManual = mode === 'manual';
 
@@ -255,9 +231,9 @@ const WaterPump = () => {
 
               <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={[styles.btn, styles.btnOn, controlLoading && styles.btnDisabled]}
+                  style={[styles.btn, styles.btnOn, (controlLoading || pumpStatus === null) && styles.btnDisabled]}
                   onPress={handlePumpOn}
-                  disabled={controlLoading}
+                  disabled={controlLoading || pumpStatus === null}
                   activeOpacity={0.8}
                 >
                   {controlLoading ? (
@@ -271,9 +247,9 @@ const WaterPump = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.btn, styles.btnOff, controlLoading && styles.btnDisabled]}
+                  style={[styles.btn, styles.btnOff, (controlLoading || pumpStatus === null) && styles.btnDisabled]}
                   onPress={handlePumpOff}
-                  disabled={controlLoading}
+                  disabled={controlLoading || pumpStatus === null}
                   activeOpacity={0.8}
                 >
                   {controlLoading ? (
@@ -339,52 +315,9 @@ const createStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.glowAccent,
     opacity: 0.55,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    gap: spacing.sm,
-  },
-  loadingText: {
-    fontSize: 15,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
-  },
-  restrictedContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    padding: spacing.lg,
-  },
-  restrictedCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.xs,
-    ...shadows.lift,
-  },
-  restrictedTitle: {
-    fontSize: 18,
-    fontFamily: fonts.bold,
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  restrictedText: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
 
   // Hero
+
   hero: {
     height: 220,
     overflow: 'hidden',

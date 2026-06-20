@@ -6,16 +6,13 @@ import Sensors from '../pages/Sensors';
 import WaterPump from '../pages/WaterPump';
 import Charts from '../pages/Charts';
 import Settings from '../pages/Settings';
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, radii } from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
-  const { userData } = useAuth();
   const { colors } = useTheme();
-  const isAdmin = userData?.role === 'admin';
 
   return (
     <Tab.Navigator
@@ -61,9 +58,7 @@ const TabNavigator = () => {
     >
       <Tab.Screen name="Home" component={Home} options={{ tabBarLabel: 'Trang chủ' }} />
       <Tab.Screen name="Sensors" component={Sensors} options={{ tabBarLabel: 'Cảm biến' }} />
-      {isAdmin && (
-        <Tab.Screen name="WaterPump" component={WaterPump} options={{ tabBarLabel: 'Máy bơm' }} />
-      )}
+      <Tab.Screen name="WaterPump" component={WaterPump} options={{ tabBarLabel: 'Máy bơm' }} />
       <Tab.Screen name="Charts" component={Charts} options={{ tabBarLabel: 'Biểu đồ' }} />
       <Tab.Screen name="Settings" component={Settings} options={{ tabBarLabel: 'Cài đặt' }} />
     </Tab.Navigator>

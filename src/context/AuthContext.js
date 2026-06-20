@@ -27,7 +27,9 @@ export const AuthProvider = ({ children }) => {
       username,
       email,
       phone,
+      password,
       role: 'user',
+      nameDevice: null,
       createdAt: serverTimestamp()
     });
     await sendEmailVerification(userCredential.user);
@@ -70,12 +72,42 @@ export const AuthProvider = ({ children }) => {
     setUserData((prev) => ({ ...prev, username, phone }));
   };
 
+  /**
+   * Lưu thiết bị:
+   * - Tạo/cập nhật document trong devices/{nameDevice}
+   * - Ghi nameDevice vào users/{uid}
+   * @param {string} nameDevice  - vd: "device1"
+   * @param {string} macAddress  - MAC address ESP32
+   * @param {string} location    - vd: "Vườn sau"
+   */
+  const saveDevice = async (nameDevice, macAddress, location) => {
+    if (!user) throw new Error('Chưa đăng nhập');
+    const nd = nameDevice.trim();
+    const mac = macAddress.trim().toUpperCase();
+    const loc = location.trim();
+
+    // Tạo/cập nhật document trong collection devices/
+    await setDoc(doc(db, 'devices', nd), {
+      nameDevice: nd,
+      macAddress: mac,
+      location: loc,
+    });
+
+    // Ghi nameDevice vào user document
+    await updateDoc(doc(db, 'users', user.uid), { nameDevice: nd });
+    setUserData((prev) => ({ ...prev, nameDevice: nd }));
+  };
+
   /** Đổi mật khẩu (cần xác thực lại trước) */
   const changePassword = async (currentPassword, newPassword) => {
     if (!user) throw new Error('Chưa đăng nhập');
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
     await reauthenticateWithCredential(user, credential);
     await updatePassword(user, newPassword);
+
+    // Cập nhật mật khẩu mới lên Firestore để đồng bộ với Web quản trị
+    await updateDoc(doc(db, 'users', user.uid), { password: newPassword });
+    setUserData((prev) => ({ ...prev, password: newPassword }));
   };
 
   useEffect(() => {
@@ -91,7 +123,7 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const value = { user, userData, loading, register, login, logout, resetPassword, updateUserProfile, changePassword };
+  const value = { user, userData, loading, register, login, logout, resetPassword, updateUserProfile, saveDevice, changePassword };
 
   return (
     <AuthContext.Provider value={value}>

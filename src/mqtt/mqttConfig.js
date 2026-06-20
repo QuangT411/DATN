@@ -11,15 +11,14 @@ export const MQTT_CONFIG = {
   connectTimeout: 10000,
 };
 
-// MQTT Topics phải khớp với code ESP32
-export const TOPICS = {
-  // Chuyển chế độ hoạt động
-  MODE: 'irrigation/mode',           // payload: "manual" | "ai"
-
-  // Điều khiển bơm (thủ công)
-  PUMP: 'irrigation/control/pump',   // payload: "ON" (bật) | "OFF" (tắt)
-  TIME: 'irrigation/control/time',   // payload: số giây (vd: "10")
-
-  // Đọc trạng thái từ ESP32 (subscribe)
-  STATUS: 'irrigation/status/pump',  // payload: "ON" | "OFF"
-};
+/**
+ * Tạo MQTT topics động theo deviceId (MAC address của ESP32)
+ * @param {string} deviceId - vd: "A4CF12ABCDEF"
+ * @returns {{ MODE, PUMP, TIME, STATUS }}
+ */
+export const getTopics = (deviceId) => ({
+  MODE: `irrigation/${deviceId}/mode`,
+  PUMP: `irrigation/${deviceId}/control/pump`,
+  TIME: `irrigation/${deviceId}/control/time`,
+  STATUS: `irrigation/${deviceId}/status/pump`,
+});

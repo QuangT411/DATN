@@ -70,9 +70,6 @@ export const lightColors = {
   glowAccent:    '#C8D8ED',
 };
 
-// Backward compat — giữ export `colors` = dark (cho TabNavigator dùng static)
-export const colors = darkColors;
-
 // ─── Hàm lấy màu theo theme ─────────────────────────────────────
 export const getColors = (isDark) => isDark ? darkColors : lightColors;
 

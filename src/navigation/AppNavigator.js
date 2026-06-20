@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { AuthProvider, useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
@@ -19,7 +19,6 @@ const AppContent = () => {
 const AppWrapper = () => {
   const { colors } = useTheme();
 
-  // Create high-end outer background matching the theme mode
   const isDark = colors.background === '#0D1410';
   const outerBg = isDark ? '#060B08' : '#E2EAE5';
 
@@ -27,9 +26,7 @@ const AppWrapper = () => {
     <View style={[styles.outerContainer, { backgroundColor: outerBg }]}>
       <View style={[styles.webWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <NavigationContainer>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
+          <AppContent />
         </NavigationContainer>
       </View>
     </View>

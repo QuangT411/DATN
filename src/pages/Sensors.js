@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Image,
   RefreshControl,
 } from 'react-native';
@@ -13,16 +12,18 @@ import { database } from '../firebase/firebaseConfig';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts, radii, spacing, shadows } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 const Sensors = () => {
   const { colors } = useTheme();
+  const { userData } = useAuth();
+  const deviceId = userData?.nameDevice ?? null;
   const [data, setData] = useState({
     light: 0,
     temperature: 0,
     humidity_air: 0,
     soil_moisture: 0,
   });
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const SENSORS = useMemo(() => [
@@ -65,7 +66,8 @@ const Sensors = () => {
   ], [colors]);
 
   useEffect(() => {
-    const dataRef = query(ref(database, 'He_thong_tuoi/sensors/data'), limitToLast(1));
+    if (!deviceId) return;
+    const dataRef = query(ref(database, `sensors/${deviceId}/data`), limitToLast(1));
     const unsubscribe = onValue(dataRef, (snapshot) => {
       if (snapshot.exists()) {
         let latest = {};
@@ -79,24 +81,14 @@ const Sensors = () => {
           soil_moisture: latest.soil_percent ?? 0,
         });
       }
-      setLoading(false);
       setRefreshing(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [deviceId]);
 
   const onRefresh = () => setRefreshing(true);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Đang đọc cảm biến...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -185,18 +177,6 @@ const createStyles = (colors) => StyleSheet.create({
     borderRadius: 140,
     backgroundColor: colors.glowAccent,
     opacity: 0.55,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    gap: spacing.sm,
-  },
-  loadingText: {
-    fontSize: 15,
-    fontFamily: fonts.medium,
-    color: colors.textSecondary,
   },
 
   // Hero
