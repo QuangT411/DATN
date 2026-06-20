@@ -67,7 +67,7 @@ const Sensors = () => {
 
   useEffect(() => {
     if (!deviceId) return;
-    const dataRef = query(ref(database, `sensors/${deviceId}/data`), limitToLast(1));
+    const dataRef = query(ref(database, `He_thong_tuoi/sensor/${deviceId}/data`), limitToLast(1));
     const unsubscribe = onValue(dataRef, (snapshot) => {
       if (snapshot.exists()) {
         let latest = {};

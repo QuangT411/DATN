@@ -67,7 +67,7 @@ const Home = () => {
 
   useEffect(() => {
     if (!deviceId) return;
-    const sensorRef = query(ref(database, `sensors/${deviceId}/data`), limitToLast(1));
+    const sensorRef = query(ref(database, `He_thong_tuoi/sensor/${deviceId}/data`), limitToLast(1));
     const unsubSensor = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         let latest = {};

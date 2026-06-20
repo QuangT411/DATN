@@ -75,7 +75,7 @@ const Charts = () => {
       const endSec = Math.floor(endOfDay.getTime() / 1000);
 
       sensorQuery = query(
-        ref(database, `sensors/${deviceId}/data`),
+        ref(database, `He_thong_tuoi/sensor/${deviceId}/data`),
         orderByKey(),
         startAt(startSec.toString()),
         endAt(endSec.toString())
@@ -84,7 +84,7 @@ const Charts = () => {
       const currentSeconds = Math.floor(Date.now() / 1000);
       const startSeconds = currentSeconds - hoursLimit * 60 * 60;
       sensorQuery = query(
-        ref(database, `sensors/${deviceId}/data`),
+        ref(database, `He_thong_tuoi/sensor/${deviceId}/data`),
         orderByKey(),
         startAt(startSeconds.toString())
       );
