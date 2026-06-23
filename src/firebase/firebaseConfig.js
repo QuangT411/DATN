@@ -18,8 +18,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Trên web: dùng browserLocalPersistence (localStorage)
-// Trên native: dùng AsyncStorage
 export const auth = initializeAuth(app, {
   persistence: Platform.OS === 'web'
     ? browserLocalPersistence
