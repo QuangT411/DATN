@@ -86,7 +86,10 @@ const Sensors = () => {
     return () => unsubscribe();
   }, [deviceId]);
 
-  const onRefresh = () => setRefreshing(true);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 2000);
+  };
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
