@@ -1,4 +1,4 @@
-# 🌿 Hệ thống tưới thông minh (Smart Irrigation System)
+
 
 Ứng dụng di động **React Native (Expo)** kết hợp với thiết bị **ESP32** và nền tảng **MQTT / Firebase** để giám sát và điều khiển hệ thống tưới cây thông minh theo thời gian thực.
 
