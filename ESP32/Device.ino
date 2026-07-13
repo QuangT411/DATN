@@ -15,7 +15,7 @@
 #define LORA_FREQ  433E6
 
 // ===== SD CARD =====
-#define SD_CS_PIN  4
+#define SD_CS_PIN  15
 bool sdAvailable = false;
 
 // ===== RELAY / BƠM =====
@@ -40,18 +40,33 @@ unsigned long       lastSoilSampleMs = 0;
 const int   FLOW_PIN           = 33;
 const float CALIBRATION_FACTOR = 98.0;
 
-volatile unsigned long pulseCount    = 0;
-unsigned long          lastMeasureMs = 0;
+volatile unsigned long sessionPulseCount = 0;  // tổng xung từ lúc relay ON
+unsigned long          relayStartMs      = 0;  // millis() khi relay bắt đầu ON
 
-float flowRateLMin = 0.0;
-float totalVolumeL = 0.0;
+float flowRateLMin = 0.0;  // Q trung bình của phiên tưới vừa kết thúc
+float totalVolumeL = 0.0;  // tổng lượng nước cộng dồn qua tất cả phiên
 
-void IRAM_ATTR flowISR() { pulseCount++; }
+void IRAM_ATTR flowISR() {
+  sessionPulseCount++;  // tích lũy toàn phiên (chỉ reset khi relay ON)
+}
 
 // ===== RELAY STATE =====
 bool          relayOn         = false;
-unsigned long relayDurationMs = 0;   
+unsigned long relayDurationMs = 0;
 unsigned long relayOffAtMs    = 0;
+bool          relayConnected  = false;  // true nếu phát hiện relay đã kết nối
+
+// Phát hiện relay: dùng INPUT_PULLUP — optocoupler module có pull-down ~1kΩ
+// mạnh hơn pull-up nội ESP32 (45kΩ) → kéo pin xuống LOW khi có relay cắm vào
+bool detectRelayConnected()
+{
+  pinMode(RELAY_PIN, INPUT_PULLUP);
+  delay(10);
+  bool found = (digitalRead(RELAY_PIN) == LOW);
+  digitalWrite(RELAY_PIN, RELAY_OFF_LEVEL);  // giữ LOW trước khi chuyển OUTPUT → tránh relay click
+  pinMode(RELAY_PIN, OUTPUT);
+  return found;
+}
 
 // ===== SENSOR =====
 Adafruit_BME280 bme;
@@ -198,15 +213,46 @@ void setRelayState(bool on)
 {
   relayOn = on;
   digitalWrite(RELAY_PIN, on ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
-  Serial.print("💧 Relay/Bơm: ");
-  Serial.println(on ? "ON" : "OFF");
+
+  if (on) {
+    // ── Bắt đầu phiên tưới: reset bộ đếm xung phiên ──
+    noInterrupts();
+    sessionPulseCount = 0;
+    interrupts();
+    relayStartMs = millis();
+    Serial.println("💧 Relay/Bơm: ON  → bắt đầu đếm xung phiên");
+  } else {
+    // ── Kết thúc phiên tưới: tính F → Q → Volume ──
+    if (relayStartMs > 0) {
+      unsigned long elapsedMs = millis() - relayStartMs;
+      if (elapsedMs > 500) {  // bỏ qua nếu relay bật < 0.5s (tránh chia 0)
+        noInterrupts();
+        unsigned long totalPulses = sessionPulseCount;
+        interrupts();
+
+        float T_s  = elapsedMs / 1000.0f;           // thời gian bật (giây)
+        float F    = totalPulses / T_s;             // tần số xung (Hz)
+        float Q    = F / CALIBRATION_FACTOR;        // lưu lượng (L/min)
+        float vol  = Q * T_s / 60.0f;              // thể tích phiên (L)
+
+        flowRateLMin  = Q;          // Q trung bình phiên → gửi LoRa
+        totalVolumeL += vol;        // cộng dồn qua các phiên
+
+        Serial.printf("💧 Relay/Bơm: OFF → T=%.1fs | Pulses=%lu | F=%.2fHz | Q=%.3fL/min | Vol=%.3fL | Total=%.3fL\n",
+                      T_s, totalPulses, F, Q, vol, totalVolumeL);
+      } else {
+        Serial.println("💧 Relay/Bơm: OFF → phiên quá ngắn, bỏ qua tính lưu lượng");
+      }
+      relayStartMs = 0;
+    } else {
+      Serial.println("💧 Relay/Bơm: OFF");
+    }
+    relayOffAtMs = 0;
+  }
 
   if (on && relayDurationMs > 0) {
     relayOffAtMs = millis() + relayDurationMs;
-    Serial.print("   Tự tắt sau (s): ");
-    Serial.println(relayDurationMs / 1000);
-  } else if (!on) {
-    relayOffAtMs = 0;
+    Serial.printf("   Tự tắt sau (s): %lu\n", relayDurationMs / 1000);
   }
 }
 
@@ -288,7 +334,7 @@ void checkLoRaCommand()
 
   // Gửi ACK xác nhận trạng thái thực tế về gateway
   delay(50);  // nhường bus LoRa trước khi TX
-  sendPumpAck(turnOn);
+  if (relayConnected) sendPumpAck(turnOn);
 }
 
 // SET UP
@@ -297,6 +343,12 @@ void setup()
   Serial.begin(115200);
 
   // GPIO
+  relayConnected = detectRelayConnected();
+  if (relayConnected) {
+    Serial.println("✅ Relay đã kết nối");
+  } else {
+    Serial.println("⚠️  Không phát hiện relay — ACK sẽ bị tắt");
+  }
   pinMode(RELAY_PIN, OUTPUT);
   setRelayState(false);
 
@@ -316,8 +368,7 @@ void setup()
   // LoRa
   initLoRa();
 
-  lastSendMs   = millis();
-  lastMeasureMs = millis();
+  lastSendMs = millis();
 }
 
 
@@ -330,28 +381,7 @@ void loop()
   if (relayOn && relayOffAtMs > 0 && (long)(millis() - relayOffAtMs) >= 0) {
     Serial.println("⏰ Hết giờ → tắt bơm tự động");
     setRelayState(false);
-    sendPumpAck(false);  
-  }
-
-  // --- Đo flow meter mỗi giây ---
-  if (millis() - lastMeasureMs >= 1000) {
-    unsigned long now     = millis();
-    unsigned long elapsed = now - lastMeasureMs;
-    lastMeasureMs = now;
-
-    noInterrupts();
-    unsigned long pulses = pulseCount;
-    pulseCount = 0;
-    interrupts();
-
-    float freq   = pulses / (elapsed / 1000.0f);
-    // Chỉ tính flow/volume khi relay đang ON → tránh nhiễu khi chân GPIO float
-    if (relayOn) {
-      flowRateLMin  = freq / CALIBRATION_FACTOR;
-      totalVolumeL += pulses / (CALIBRATION_FACTOR * 60.0f);
-    } else {
-      flowRateLMin = 0.0f;
-    }
+    if (relayConnected) sendPumpAck(false);
   }
 
   // --- SOIL SMA: lấy 1 mẫu mỗi 30 giây (non-blocking) ---
@@ -359,7 +389,6 @@ void loop()
     lastSoilSampleMs = millis();
     float rawPct = mapSoilPercentF((float)readSoilRaw());
     soilSmaPush(rawPct);
-    Serial.printf("[SMA] Mẫu %d/%d: %.2f%%\n", soilSmaCount, SMA_WINDOW, rawPct);
   }
 
   // --- Gửi dữ liệu mỗi 5 phút ---
